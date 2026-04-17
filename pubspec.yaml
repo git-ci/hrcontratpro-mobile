@@ -1,0 +1,56 @@
+name: HrContratPro
+description: HrContratPro — Système RH intelligent
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # HTTP & API
+  http: ^1.1.0
+  shared_preferences: ^2.2.2
+
+  # Navigation
+  go_router: ^12.1.3
+
+  # UI
+  shimmer: ^3.0.0
+
+  # QR Code — version compatible Dart 3.3
+  mobile_scanner: ^3.5.6
+  qr_flutter: ^4.1.0
+
+  # Graphiques
+  fl_chart: ^0.66.2
+
+  # Fichiers
+  file_picker: ^6.2.1
+  image_picker: ^1.0.7
+
+  # Utilitaires
+  intl: ^0.18.1
+  url_launcher: ^6.2.5
+  package_info_plus: ^5.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png
+    - assets/icon.png
