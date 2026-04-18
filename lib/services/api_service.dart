@@ -16,6 +16,9 @@ class ApiException implements Exception {
 class ApiService {
   static const _keyToken = 'auth_token';
 
+  /// Callback déclenché automatiquement lors d'un 401 (session expirée).
+  static void Function()? onUnauthorized;
+
   // ── Token ────────────────────────────────────────────────────────────────────
 
   static Future<String?> getToken() async {
@@ -88,6 +91,10 @@ class ApiService {
     final msg = (json is Map && json['message'] != null)
         ? json['message'] as String
         : 'Erreur ${response.statusCode}';
+    if (response.statusCode == 401) {
+      await clearToken();
+      onUnauthorized?.call();
+    }
     throw ApiException(msg, statusCode: response.statusCode);
   }
 
@@ -250,6 +257,26 @@ class ApiService {
           int id, File pdf) async =>
       await uploadFile('/contracts/$id/pdf', pdf, 'pdf')
           as Map<String, dynamic>;
+
+  /// Télécharge les octets bruts d'un fichier (PDF, image…) avec authentification.
+  static Future<Uint8List> downloadBytes(String endpoint) async {
+    final token = await getToken();
+    final headers = <String, String>{
+      'Accept': '*/*',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+    final response = await http
+        .get(Uri.parse('$_base$endpoint'), headers: headers)
+        .timeout(const Duration(seconds: 30));
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return response.bodyBytes;
+    }
+    throw ApiException('Erreur téléchargement : ${response.statusCode}',
+        statusCode: response.statusCode);
+  }
+
+  static Future<Uint8List> downloadContractPdf(int id) =>
+      downloadBytes('/contracts/$id/pdf');
 
   // ── Pointage ─────────────────────────────────────────────────────────────────
 

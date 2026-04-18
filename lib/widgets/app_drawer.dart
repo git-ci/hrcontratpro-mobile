@@ -1,10 +1,11 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 
 // ── ShellScope ────────────────────────────────────────────────────────────────
-/// Transmet la fonction openDrawer du Scaffold externe aux écrans enfants.
 class ShellScope extends InheritedWidget {
   final VoidCallback openDrawer;
   const ShellScope({super.key, required this.openDrawer, required super.child});
@@ -17,7 +18,6 @@ class ShellScope extends InheritedWidget {
 }
 
 // ── DrawerMenuButton ──────────────────────────────────────────────────────────
-/// Bouton hamburger à placer dans AppBar.leading pour ouvrir le drawer.
 class DrawerMenuButton extends StatelessWidget {
   const DrawerMenuButton({super.key});
 
@@ -34,26 +34,51 @@ class DrawerMenuButton extends StatelessWidget {
 }
 
 // ── AppDrawer ─────────────────────────────────────────────────────────────────
-class AppDrawer extends StatelessWidget {
+class AppDrawer extends StatefulWidget {
   final String role;
   const AppDrawer({super.key, required this.role});
 
   @override
-  Widget build(BuildContext context) {
-    final user = AuthService.user;
-    final name = user?['name'] ?? '';
-    final email = user?['email'] ?? '';
-    final prefix = role == 'employee' ? 'emp' : role;
-    final location = GoRouterState.of(context).matchedLocation;
+  State<AppDrawer> createState() => _AppDrawerState();
+}
 
-    final roleLabel = role == 'dg'
+class _AppDrawerState extends State<AppDrawer> {
+  Uint8List? _photoBytes;
+  bool _loggingOut = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPhoto();
+  }
+
+  Future<void> _loadPhoto() async {
+    final bytes = await ApiService.getProfilePhotoBytes();
+    if (mounted) setState(() => _photoBytes = bytes);
+  }
+
+  Future<void> _logout() async {
+    setState(() => _loggingOut = true);
+    await AuthService.logout();
+    if (mounted) context.go('/login');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user      = AuthService.user;
+    final name      = user?['name'] ?? '';
+    final email     = user?['email'] ?? '';
+    final prefix    = widget.role == 'employee' ? 'emp' : widget.role;
+    final location  = GoRouterState.of(context).matchedLocation;
+
+    final roleLabel = widget.role == 'dg'
         ? 'Direction Générale'
-        : role == 'rh'
+        : widget.role == 'rh'
             ? 'Ressources Humaines'
             : 'Employé';
-    final roleColor = role == 'dg'
+    final roleColor = widget.role == 'dg'
         ? AppTheme.dgColor
-        : role == 'rh'
+        : widget.role == 'rh'
             ? AppTheme.rhColor
             : AppTheme.empColor;
 
@@ -61,7 +86,7 @@ class AppDrawer extends StatelessWidget {
 
     return Drawer(
       child: Column(children: [
-        // ── En-tête ─────────────────────────────────────────────────────────
+        // ── En-tête ───────────────────────────────────────────────────────────
         DrawerHeader(
           margin: EdgeInsets.zero,
           decoration: BoxDecoration(
@@ -69,16 +94,21 @@ class AppDrawer extends StatelessWidget {
                 colors: [roleColor, roleColor.withOpacity(0.75)]),
           ),
           child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            // Avatar avec photo ou initiale
             CircleAvatar(
-              radius: 28,
+              radius: 30,
               backgroundColor: Colors.white.withOpacity(0.2),
-              child: Text(
-                name.isNotEmpty ? name[0].toUpperCase() : '?',
-                style: const TextStyle(
-                    fontSize: 22,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700),
-              ),
+              backgroundImage:
+                  _photoBytes != null ? MemoryImage(_photoBytes!) : null,
+              child: _photoBytes == null
+                  ? Text(
+                      name.isNotEmpty ? name[0].toUpperCase() : '?',
+                      style: const TextStyle(
+                          fontSize: 22,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700),
+                    )
+                  : null,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -118,7 +148,7 @@ class AppDrawer extends StatelessWidget {
           ]),
         ),
 
-        // ── Navigation ──────────────────────────────────────────────────────
+        // ── Navigation ────────────────────────────────────────────────────────
         Expanded(
           child: ListView(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
@@ -149,12 +179,11 @@ class AppDrawer extends StatelessWidget {
           ),
         ),
 
-        // ── Bas du drawer ────────────────────────────────────────────────────
+        // ── Bas du drawer ─────────────────────────────────────────────────────
         const Divider(height: 1),
         ListTile(
           dense: true,
-          leading:
-              const Icon(Icons.person_outline, color: AppTheme.textMuted),
+          leading: const Icon(Icons.person_outline, color: AppTheme.textMuted),
           title: const Text('Mon profil', style: TextStyle(fontSize: 14)),
           onTap: () {
             Navigator.pop(context);
@@ -163,14 +192,20 @@ class AppDrawer extends StatelessWidget {
         ),
         ListTile(
           dense: true,
-          leading: const Icon(Icons.logout, color: AppTheme.danger),
-          title: const Text('Se déconnecter',
-              style: TextStyle(color: AppTheme.danger, fontSize: 14)),
-          onTap: () async {
-            Navigator.pop(context);
-            await AuthService.logout();
-            if (context.mounted) context.go('/login');
-          },
+          leading: _loggingOut
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: AppTheme.danger),
+                )
+              : const Icon(Icons.logout, color: AppTheme.danger),
+          title: Text(
+            _loggingOut ? 'Déconnexion…' : 'Se déconnecter',
+            style: const TextStyle(color: AppTheme.danger, fontSize: 14),
+          ),
+          enabled: !_loggingOut,
+          onTap: _loggingOut ? null : _logout,
         ),
         const SizedBox(height: 8),
       ]),
@@ -181,32 +216,32 @@ class AppDrawer extends StatelessWidget {
     switch (prefix) {
       case 'dg':
         return const [
-          _DrawerItem('/dg/dashboard', Icons.dashboard_outlined, 'Tableau de bord'),
-          _DrawerItem('/dg/employees', Icons.people_outline, 'Employés'),
-          _DrawerItem('/dg/attendance', Icons.schedule_outlined, 'Pointage'),
-          _DrawerItem('/dg/contracts', Icons.description_outlined, 'Contrats'),
-          _DrawerItem('/dg/requests', Icons.assignment_outlined, 'Demandes'),
-          _DrawerItem('/dg/leaves', Icons.beach_access_outlined, 'Congés'),
-          _DrawerItem('/dg/notifications', Icons.notifications_outlined, 'Notifications'),
+          _DrawerItem('/dg/dashboard',      Icons.dashboard_outlined,    'Tableau de bord'),
+          _DrawerItem('/dg/employees',       Icons.people_outline,        'Employés'),
+          _DrawerItem('/dg/attendance',      Icons.schedule_outlined,     'Pointage'),
+          _DrawerItem('/dg/contracts',       Icons.description_outlined,  'Contrats'),
+          _DrawerItem('/dg/requests',        Icons.assignment_outlined,   'Demandes'),
+          _DrawerItem('/dg/leaves',          Icons.beach_access_outlined, 'Congés'),
+          _DrawerItem('/dg/notifications',   Icons.notifications_outlined,'Notifications'),
         ];
       case 'rh':
         return const [
-          _DrawerItem('/rh/dashboard', Icons.dashboard_outlined, 'Tableau de bord'),
-          _DrawerItem('/rh/employees', Icons.people_outline, 'Employés'),
-          _DrawerItem('/rh/attendance', Icons.schedule_outlined, 'Pointage'),
-          _DrawerItem('/rh/contracts', Icons.description_outlined, 'Contrats'),
-          _DrawerItem('/rh/requests', Icons.assignment_outlined, 'Demandes'),
-          _DrawerItem('/rh/leaves', Icons.beach_access_outlined, 'Congés'),
-          _DrawerItem('/rh/notifications', Icons.notifications_outlined, 'Notifications'),
+          _DrawerItem('/rh/dashboard',      Icons.dashboard_outlined,    'Tableau de bord'),
+          _DrawerItem('/rh/employees',       Icons.people_outline,        'Employés'),
+          _DrawerItem('/rh/attendance',      Icons.schedule_outlined,     'Pointage'),
+          _DrawerItem('/rh/contracts',       Icons.description_outlined,  'Contrats'),
+          _DrawerItem('/rh/requests',        Icons.assignment_outlined,   'Demandes'),
+          _DrawerItem('/rh/leaves',          Icons.beach_access_outlined, 'Congés'),
+          _DrawerItem('/rh/notifications',   Icons.notifications_outlined,'Notifications'),
         ];
       default: // emp
         return const [
-          _DrawerItem('/emp/dashboard', Icons.home_outlined, 'Accueil'),
-          _DrawerItem('/emp/scan', Icons.qr_code_scanner, 'Scanner QR'),
-          _DrawerItem('/emp/attendance', Icons.schedule_outlined, 'Pointage'),
-          _DrawerItem('/emp/contracts', Icons.description_outlined, 'Mes contrats'),
-          _DrawerItem('/emp/leaves', Icons.beach_access_outlined, 'Mes congés'),
-          _DrawerItem('/emp/notifications', Icons.notifications_outlined, 'Notifications'),
+          _DrawerItem('/emp/dashboard',     Icons.home_outlined,         'Accueil'),
+          _DrawerItem('/emp/scan',           Icons.qr_code_scanner,      'Scanner QR'),
+          _DrawerItem('/emp/attendance',     Icons.schedule_outlined,     'Pointage'),
+          _DrawerItem('/emp/contracts',      Icons.description_outlined,  'Mes contrats'),
+          _DrawerItem('/emp/leaves',         Icons.beach_access_outlined, 'Mes congés'),
+          _DrawerItem('/emp/notifications',  Icons.notifications_outlined,'Notifications'),
         ];
     }
   }

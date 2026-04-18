@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/api_service.dart';
@@ -83,8 +83,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _pickAndUploadPhoto(ImageSource source) async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: source, imageQuality: 85);
+    XFile? picked;
+    try {
+      picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      final msg = switch (e.code) {
+        'camera_access_denied' => 'Accès à la caméra refusé. Activez-le dans Réglages.',
+        'photo_access_denied'  => 'Accès à la galerie refusé. Activez-le dans Réglages.',
+        'no_camera'            => 'Aucune caméra disponible sur cet appareil.',
+        _                      => 'Impossible d\'accéder à la caméra : ${e.message}',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), backgroundColor: AppTheme.danger));
+      return;
+    }
     if (picked == null) return;
     setState(() => _photoLoading = true);
     try {

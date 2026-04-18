@@ -45,5 +45,16 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>L'application utilise la caméra pour scanner les QR codes de pointage.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>L'application accède à la galerie pour la photo de profil.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>L'application peut enregistrer des photos dans votre galerie.</string>
 </dict>
 </plist>

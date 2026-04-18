@@ -7,6 +7,7 @@ class AuthService {
   static String? _token;
   static String? _role;
 
+
   static Map<String, dynamic>? get user  => _user;
   static String?               get token => _token;
   static String?               get role  => _role;
@@ -49,13 +50,19 @@ class AuthService {
   // ── Logout ───────────────────────────────────────────────────────────────────
 
   static Future<void> logout() async {
-    await ApiService.logout();
+    try { await ApiService.logout(); } catch (_) {}
+    await clearSession();
+  }
+
+  /// Nettoie la session localement (sans appel API) — utilisé sur 401.
+  static Future<void> clearSession() async {
     _token = null;
     _user  = null;
     _role  = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     await prefs.remove('auth_user');
+    await ApiService.clearToken();
   }
 
   // ── Refresh profil ───────────────────────────────────────────────────────────

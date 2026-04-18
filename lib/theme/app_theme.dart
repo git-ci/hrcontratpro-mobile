@@ -18,7 +18,7 @@ class AppTheme {
   // ── Rôles couleurs ──────────────────────────────────────────────────────────
   static const Color dgColor  = Color(0xFF1a2540);
   static const Color rhColor  = Color(0xFF1971c2);
-  static const Color empColor = Color(0xFF2b8a3e);
+  static const Color empColor = Color(0xFF1A237E);
 
   static ThemeData get light => ThemeData(
     useMaterial3: true,

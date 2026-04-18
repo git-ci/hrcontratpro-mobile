@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
@@ -192,7 +194,29 @@ class _ContractDetail extends StatefulWidget {
 }
 
 class _ContractDetailState extends State<_ContractDetail> {
-  bool _uploading = false;
+  bool _uploading  = false;
+  bool _pdfLoading = false;
+
+  Future<void> _openPdf() async {
+    setState(() => _pdfLoading = true);
+    try {
+      final bytes = await ApiService.downloadContractPdf(widget.contract['id']);
+      final tmpDir = await getTemporaryDirectory();
+      final file   = File('${tmpDir.path}/contrat_${widget.contract['id']}.pdf');
+      await file.writeAsBytes(bytes);
+      final result = await OpenFile.open(file.path);
+      if (result.type != ResultType.done && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Impossible d\'ouvrir le PDF : ${result.message}'),
+          backgroundColor: AppTheme.danger));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e.toString()), backgroundColor: AppTheme.danger));
+    } finally {
+      if (mounted) setState(() => _pdfLoading = false);
+    }
+  }
 
   Future<void> _uploadPdf() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.custom,
@@ -298,18 +322,30 @@ class _ContractDetailState extends State<_ContractDetail> {
 
           // Actions
           if (c['has_pdf'] == true)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.success.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppTheme.success.withOpacity(0.3))),
-              child: const Row(children: [
-                Icon(Icons.picture_as_pdf, color: AppTheme.success),
-                SizedBox(width: 8),
-                Text('Contrat PDF joint', style: TextStyle(color: AppTheme.success,
-                  fontWeight: FontWeight.w600)),
-              ]),
+            InkWell(
+              onTap: _pdfLoading ? null : _openPdf,
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.success.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.success.withOpacity(0.3))),
+                child: Row(children: [
+                  _pdfLoading
+                    ? const SizedBox(width: 20, height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2,
+                            color: AppTheme.success))
+                    : const Icon(Icons.picture_as_pdf, color: AppTheme.success),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(
+                    _pdfLoading ? 'Ouverture en cours…' : 'Contrat PDF joint — Appuyer pour ouvrir',
+                    style: const TextStyle(color: AppTheme.success,
+                        fontWeight: FontWeight.w600))),
+                  if (!_pdfLoading)
+                    const Icon(Icons.open_in_new, size: 16, color: AppTheme.success),
+                ]),
+              ),
             )
           else if (AuthService.isDG || AuthService.isRH)
             SizedBox(

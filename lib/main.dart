@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'services/auth_service.dart';
+import 'services/api_service.dart';
 import 'theme/app_theme.dart';
 import 'widgets/app_drawer.dart';
 
@@ -21,6 +22,13 @@ import 'screens/leaves/leaves_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AuthService.loadFromStorage();
+
+  // Déconnexion automatique sur 401 (session expirée / token invalide)
+  ApiService.onUnauthorized = () async {
+    await AuthService.clearSession();
+    _router.go('/login');
+  };
+
   runApp(const HrContratProApp());
 }
 
