@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:go_router/go_router.dart';
@@ -47,21 +48,28 @@ class _QrScanScreenState extends State<QrScanScreen> {
     try {
       String? payload, signature;
 
-      // Résoudre l'URL courte /s/
-      if (code.contains('/s/') && code.startsWith('http')) {
-        final res = await _resolveShortUrl(code);
-        payload = res['payload'];
-        signature = res['sig'];
-      } else if (code.contains('/scan?') && code.contains('payload=')) {
-        final uri = Uri.parse(code);
-        payload = uri.queryParameters['payload'];
-        signature = uri.queryParameters['sig'];
+      if (code.startsWith('http')) {
+        try {
+          final uri = Uri.parse(code);
+          payload = uri.queryParameters['payload'];
+          signature = uri.queryParameters['sig'];
+
+          // URL courte (/s/token) : résoudre la redirection pour obtenir payload et sig
+          if ((payload == null || signature == null) && code.contains('/s/')) {
+            final resolved = await _resolveShortUrl(code);
+            payload = resolved['payload'];
+            signature = resolved['sig'];
+          }
+        } catch (_) {}
       }
 
       if (payload == null || signature == null) {
         setState(() {
           _message = 'QR code invalide.';
           _processing = false;
+        });
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) setState(() => _message = null);
         });
         return;
       }
@@ -95,17 +103,25 @@ class _QrScanScreenState extends State<QrScanScreen> {
     }
   }
 
-  Future<Map<String, String?>> _resolveShortUrl(String url) async {
+  Future<Map<String, String?>> _resolveShortUrl(String shortUrl) async {
     try {
-      final res = await ApiService.request('GET', '', auth: false);
-      final uri = Uri.parse(url);
-      return {
-        'payload': uri.queryParameters['payload'],
-        'sig': uri.queryParameters['sig']
-      };
-    } catch (_) {
-      return {'payload': null, 'sig': null};
-    }
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 8);
+      final request = await client.getUrl(Uri.parse(shortUrl));
+      request.followRedirects = false;
+      final response = await request.close();
+      await response.drain<void>();
+      client.close();
+      final location = response.headers.value(HttpHeaders.locationHeader);
+      if (location != null) {
+        final uri = Uri.parse(location);
+        return {
+          'payload': uri.queryParameters['payload'],
+          'sig': uri.queryParameters['sig'],
+        };
+      }
+    } catch (_) {}
+    return {'payload': null, 'sig': null};
   }
 
   Future<void> _submitMatricule() async {
@@ -319,9 +335,8 @@ class _ScanOverlay extends CustomPainter {
       ..strokeWidth = 3
       ..style = PaintingStyle.stroke;
     const l = 30.0;
-    const r = 12.0;
     final corners = [
-      Offset(20, 20),
+      const Offset(20, 20),
       Offset(size.width - 20, 20),
       Offset(20, size.height - 20),
       Offset(size.width - 20, size.height - 20),
