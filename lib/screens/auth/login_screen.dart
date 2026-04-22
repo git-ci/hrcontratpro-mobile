@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/checkin_reminder_service.dart';
 import '../../theme/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -30,6 +31,8 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     try {
       await AuthService.login(email, password);
+      await CheckinReminderService.requestPermissions();
+      CheckinReminderService.scheduleReminders();
       if (mounted) context.go(AuthService.initialRoute);
     } on ApiException catch (e) {
       setState(() => _error = e.message);

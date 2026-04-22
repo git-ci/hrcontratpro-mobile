@@ -463,6 +463,35 @@ class _HistoryTabState extends State<_HistoryTab> {
   }
 }
 
+// ── Chip heure arrivée / départ ────────────────────────────────────────────────
+class _TimeChip extends StatelessWidget {
+  final String label;
+  final String? time;
+  final Color color;
+
+  const _TimeChip({required this.label, required this.time, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    if (time == null) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Text('$label : ',
+            style: TextStyle(fontSize: 11, color: color.withOpacity(0.8))),
+        Text(time!,
+            style: TextStyle(
+                fontSize: 12, color: color, fontWeight: FontWeight.w700)),
+      ]),
+    );
+  }
+}
+
 // ── Mon pointage (Employé) ──────────────────────────────────────────────────────
 class _MyAttendanceTab extends StatefulWidget {
   const _MyAttendanceTab();
@@ -538,19 +567,75 @@ class _MyAttendanceTabState extends State<_MyAttendanceTab> {
           final cfg = _statuses[s] ??
               {'label': s, 'icon': '•', 'color': AppTheme.textMuted};
           final color = cfg['color'] as Color;
+          final checkinTime  = r['checked_in_at']  as String?;
+          final checkoutTime = r['checked_out_at'] as String?;
+          final hasTime = checkinTime != null || checkoutTime != null;
           return Card(
-            child: ListTile(
-              leading: Text(cfg['icon'] as String,
-                  style: const TextStyle(fontSize: 22)),
-              title: Text(_fmtDateFr(r['date'] ?? ''),
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Row(children: [
-                Text(cfg['label'] as String,
-                    style:
-                        TextStyle(color: color, fontWeight: FontWeight.w500)),
-                if (r['source'] == 'qr')
-                  const Text(' · 📷 QR',
-                      style: TextStyle(fontSize: 11, color: AppTheme.info)),
+            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                Text(cfg['icon'] as String,
+                    style: const TextStyle(fontSize: 22)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Ligne 1 : date + statut
+                      Row(children: [
+                        Text(_fmtDateFr(r['date'] ?? ''),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 14)),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(cfg['label'] as String,
+                              style: TextStyle(
+                                  color: color,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 11)),
+                        ),
+                        if (r['source'] == 'qr') ...[
+                          const SizedBox(width: 6),
+                          const Text('📷 QR',
+                              style: TextStyle(
+                                  fontSize: 10, color: AppTheme.info)),
+                        ],
+                      ]),
+                      // Ligne 2 : arrivée → départ (même ligne)
+                      if (hasTime) ...[
+                        const SizedBox(height: 5),
+                        Row(children: [
+                          _TimeChip(
+                            label: 'Arrivée',
+                            time: checkinTime,
+                            color: AppTheme.success,
+                          ),
+                          if (checkinTime != null && checkoutTime != null)
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 6),
+                              child: Text('→',
+                                  style: TextStyle(
+                                      color: AppTheme.textMuted,
+                                      fontSize: 12)),
+                            ),
+                          _TimeChip(
+                            label: 'Départ',
+                            time: checkoutTime,
+                            color: const Color(0xFFE8590C),
+                          ),
+                        ]),
+                      ],
+                    ],
+                  ),
+                ),
               ]),
             ),
           );

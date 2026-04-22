@@ -388,7 +388,7 @@ class _LeavePlanDetail extends StatelessWidget {
                 Text(pCfg['icon'] as String, style: const TextStyle(fontSize: 18)),
                 const SizedBox(width: 10),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('${_fmtDate(per['start_date'])} → ${_fmtDate(per['end_date'])}',
+                  Text('${_fmtDate(per['start'])} → ${_fmtDate(per['end'])}',
                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                   Text('${per['days'] ?? 0} jours · ${pCfg['label']}',
                     style: TextStyle(fontSize: 12, color: pColor)),
@@ -467,55 +467,76 @@ class _AddLeaveFormState extends State<_AddLeaveForm> {
   bool _loading = false;
   String? _error;
 
-  void _addPeriod() async {
-    DateTime? start, end;
+  Future<void> _openPeriodDialog({int? editIndex}) async {
+    final existing = editIndex != null ? _periods[editIndex] : null;
+    DateTime? start = existing != null ? DateTime.parse(existing['start']) : null;
+    DateTime? end   = existing != null ? DateTime.parse(existing['end'])   : null;
+
     await showDialog(context: context, builder: (_) => StatefulBuilder(
       builder: (ctx, setInner) => AlertDialog(
-        title: const Text('Ajouter une période'),
+        title: Text(editIndex == null ? 'Ajouter une période' : 'Modifier la période'),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
-          OutlinedButton.icon(
-            icon: const Icon(Icons.date_range, size: 16),
-            label: Text(start == null ? 'Date de début'
-              : '${start!.day}/${start!.month}/${start!.year}'),
-            onPressed: () async {
-              final d = await showDatePicker(context: ctx,
-                initialDate: DateTime.now(), firstDate: DateTime(2020),
-                lastDate: DateTime(2100));
-              if (d != null) setInner(() => start = d);
-            },
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.date_range, size: 16),
+              label: Text(start == null
+                ? 'Date de début'
+                : '${start!.day.toString().padLeft(2,'0')}/${start!.month.toString().padLeft(2,'0')}/${start!.year}'),
+              onPressed: () async {
+                final d = await showDatePicker(context: ctx,
+                  initialDate: start ?? DateTime.now(),
+                  firstDate: DateTime(2020), lastDate: DateTime(2100));
+                if (d != null) setInner(() => start = d);
+              },
+            ),
           ),
           const SizedBox(height: 8),
-          OutlinedButton.icon(
-            icon: const Icon(Icons.event, size: 16),
-            label: Text(end == null ? 'Date de fin'
-              : '${end!.day}/${end!.month}/${end!.year}'),
-            onPressed: () async {
-              final d = await showDatePicker(context: ctx,
-                initialDate: start ?? DateTime.now(), firstDate: DateTime(2020),
-                lastDate: DateTime(2100));
-              if (d != null) setInner(() => end = d);
-            },
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.event, size: 16),
+              label: Text(end == null
+                ? 'Date de fin'
+                : '${end!.day.toString().padLeft(2,'0')}/${end!.month.toString().padLeft(2,'0')}/${end!.year}'),
+              onPressed: () async {
+                final d = await showDatePicker(context: ctx,
+                  initialDate: end ?? start ?? DateTime.now(),
+                  firstDate: DateTime(2020), lastDate: DateTime(2100));
+                if (d != null) setInner(() => end = d);
+              },
+            ),
           ),
         ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
           ElevatedButton(
-            onPressed: start != null && end != null
+            onPressed: start != null && end != null && !end!.isBefore(start!)
               ? () {
-                  setState(() => _periods.add({
-                    'start_date': start!.toIso8601String().substring(0, 10),
-                    'end_date':   end!.toIso8601String().substring(0, 10),
-                    'days': end!.difference(start!).inDays + 1,
-                  }));
+                  final entry = {
+                    'start': start!.toIso8601String().substring(0, 10),
+                    'end':   end!.toIso8601String().substring(0, 10),
+                    'days':  end!.difference(start!).inDays + 1,
+                  };
+                  setState(() {
+                    if (editIndex != null) {
+                      _periods[editIndex] = entry;
+                    } else {
+                      _periods.add(entry);
+                    }
+                  });
                   Navigator.pop(ctx);
                 }
               : null,
-            child: const Text('Ajouter'),
+            child: Text(editIndex == null ? 'Ajouter' : 'Enregistrer'),
           ),
         ],
       ),
     ));
   }
+
+  void _addPeriod()           => _openPeriodDialog();
+  void _editPeriod(int index) => _openPeriodDialog(editIndex: index);
 
   Future<void> _submit() async {
     if (_periods.isEmpty) {
@@ -528,6 +549,7 @@ class _AddLeaveFormState extends State<_AddLeaveForm> {
         'year':    _year,
         'reason':  _reason.text,
         'periods': _periods,
+        'submit':  true,
       });
       widget.onSubmitted();
       if (mounted) {
@@ -577,21 +599,32 @@ class _AddLeaveFormState extends State<_AddLeaveForm> {
           ),
         ]),
 
-        ..._periods.map((p) => Container(
-          margin: const EdgeInsets.only(bottom: 6),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: AppTheme.primary.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppTheme.primary.withOpacity(0.2))),
-          child: Row(children: [
-            Expanded(child: Text(
-              '${p['start_date']} → ${p['end_date']} (${p['days']} jours)',
-              style: const TextStyle(fontSize: 13))),
-            IconButton(icon: const Icon(Icons.delete, size: 16, color: AppTheme.danger),
-              onPressed: () => setState(() => _periods.remove(p))),
-          ]),
-        )),
+        ...List.generate(_periods.length, (i) {
+          final p = _periods[i];
+          return Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.only(left: 12, top: 4, bottom: 4),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.primary.withOpacity(0.2))),
+            child: Row(children: [
+              Expanded(child: Text(
+                '${p['start']} → ${p['end']} (${p['days']} jours)',
+                style: const TextStyle(fontSize: 13))),
+              IconButton(
+                icon: const Icon(Icons.edit, size: 16, color: AppTheme.info),
+                onPressed: () => _editPeriod(i),
+                tooltip: 'Modifier',
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete, size: 16, color: AppTheme.danger),
+                onPressed: () => setState(() => _periods.removeAt(i)),
+                tooltip: 'Supprimer',
+              ),
+            ]),
+          );
+        }),
 
         const SizedBox(height: 12),
         TextField(controller: _reason, maxLines: 3,

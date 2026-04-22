@@ -72,7 +72,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Center(child: Text(
-                          data['icon'] ?? '🔔',
+                          _resolveIcon(data['icon'] as String?),
                           style: const TextStyle(fontSize: 18),
                         )),
                       ),
@@ -113,6 +113,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               ),
             ),
     );
+  }
+
+  static const _iconMap = {
+    'file-text'      : '📄',
+    'check-circle'   : '✅',
+    'x-circle'       : '❌',
+    'bell'           : '🔔',
+    'alert-triangle' : '⚠️',
+    'calendar'       : '📅',
+    'user'           : '👤',
+    'clock'          : '🕐',
+    'info'           : 'ℹ️',
+  };
+
+  String _resolveIcon(String? raw) {
+    if (raw == null || raw.isEmpty) return '🔔';
+    return _iconMap[raw] ?? raw; // si c'est déjà un emoji, le renvoyer tel quel
   }
 
   String _fmtDate(String? d) {

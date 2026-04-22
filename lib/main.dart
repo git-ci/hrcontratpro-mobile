@@ -3,11 +3,13 @@ import 'package:go_router/go_router.dart';
 
 import 'services/auth_service.dart';
 import 'services/api_service.dart';
+import 'services/checkin_reminder_service.dart';
 import 'theme/app_theme.dart';
 import 'widgets/app_drawer.dart';
 
 // Screens
 import 'screens/auth/login_screen.dart';
+import 'screens/splash_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/employees/employees_screen.dart';
 import 'screens/employees/employee_form_screen.dart';
@@ -22,12 +24,19 @@ import 'screens/leaves/leaves_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AuthService.loadFromStorage();
+  await CheckinReminderService.init();
 
   // Déconnexion automatique sur 401 (session expirée / token invalide)
   ApiService.onUnauthorized = () async {
     await AuthService.clearSession();
+    await CheckinReminderService.cancelReminders();
     _router.go('/login');
   };
+
+  if (AuthService.isLoggedIn) {
+    await CheckinReminderService.requestPermissions();
+    CheckinReminderService.scheduleReminders();
+  }
 
   runApp(const HrContratProApp());
 }
@@ -37,17 +46,18 @@ final _router = GoRouter(
   initialLocation: '/',
   redirect: (ctx, state) async {
     final loggedIn = AuthService.isLoggedIn;
-    final isAuthPage = state.matchedLocation == '/login';
+    final loc = state.matchedLocation;
+    final isSplash  = loc == '/';
+    final isAuthPage = loc == '/login';
 
+    if (isSplash) return null; // Le splash gère lui-même la navigation
     if (!loggedIn && !isAuthPage) return '/login';
-    if (loggedIn && state.matchedLocation == '/') {
-      return AuthService.initialRoute;
-    }
+    if (loggedIn && isAuthPage) return AuthService.initialRoute;
     return null;
   },
   routes: [
     // ── Auth ────────────────────────────────────────────────────────────────
-    GoRoute(path: '/', redirect: (_, __) => '/login'),
+    GoRoute(path: '/', builder: (_, __) => const SplashScreen()),
     GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
     GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
 

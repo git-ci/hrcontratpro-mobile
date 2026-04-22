@@ -4,6 +4,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/checkin_reminder_service.dart';
 import '../../theme/app_theme.dart';
 
 class QrScanScreen extends StatefulWidget {
@@ -88,18 +89,30 @@ class _QrScanScreenState extends State<QrScanScreen> {
       // Mode scan normal → pointer directement
       await _controller.stop();
       final result = await ApiService.scanQr(payload, signature);
+      CheckinReminderService.cancelReminders();
       setState(() {
         _done = true;
         _success = true;
         _message = result['message'] ?? 'Présence enregistrée !';
       });
     } catch (e) {
+      final msg = e.toString();
+      // Garder _processing = true pour bloquer de nouveaux scans pendant l'affichage
       setState(() {
-        _message = e.toString();
+        _message = msg;
+        _processing = true;
+      });
+      // Messages métier importants → 10 s, erreurs courtes → 4 s
+      final isImportant = msg.contains('arrivée') ||
+          msg.contains('départ') ||
+          msg.contains('déjà') ||
+          msg.contains('téléphone') ||
+          msg.contains('refusé');
+      await Future.delayed(Duration(seconds: isImportant ? 10 : 4));
+      if (mounted) setState(() {
+        _message = null;
         _processing = false;
       });
-      await Future.delayed(const Duration(seconds: 2));
-      if (mounted) setState(() => _message = null);
     }
   }
 
@@ -144,10 +157,18 @@ class _QrScanScreenState extends State<QrScanScreen> {
         _message = result['message'] ?? 'Présence enregistrée !';
       });
     } catch (e) {
+      final msg = e.toString();
       setState(() {
-        _message = e.toString();
+        _message = msg;
         _processing = false;
       });
+      final isImportant = msg.contains('arrivée') ||
+          msg.contains('départ') ||
+          msg.contains('déjà') ||
+          msg.contains('téléphone') ||
+          msg.contains('refusé');
+      await Future.delayed(Duration(seconds: isImportant ? 10 : 4));
+      if (mounted) setState(() => _message = null);
     }
   }
 

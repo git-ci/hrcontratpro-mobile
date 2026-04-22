@@ -10,6 +10,8 @@ dependencies:
   flutter:
     sdk: flutter
 
+  cupertino_icons: ^1.0.6
+
   # HTTP & API
   http: ^1.1.0
   shared_preferences: ^2.2.2
@@ -30,6 +32,10 @@ dependencies:
   # Fichiers
   file_picker: ^6.2.1
   image_picker: ^1.0.7
+
+  # Notifications locales
+  flutter_local_notifications: ^17.2.0
+  timezone: ^0.9.4
 
   # Utilitaires
   intl: ^0.18.1
