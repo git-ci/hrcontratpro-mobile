@@ -278,6 +278,27 @@ class ApiService {
   static Future<Uint8List> downloadContractPdf(int id) =>
       downloadBytes('/contracts/$id/pdf');
 
+  // ── Bulletins de salaire ─────────────────────────────────────────────────────
+
+  static Future<Map<String, dynamic>> getPayslips({String? params}) async =>
+      await request('GET', '/payslips${params ?? ''}') as Map<String, dynamic>;
+
+  static Future<List<dynamic>> getMyPayslips() async =>
+      await request('GET', '/my-payslips') as List<dynamic>;
+
+  static Future<Map<String, dynamic>> createPayslip(
+          Map<String, dynamic> data) async =>
+      await request('POST', '/payslips', body: data) as Map<String, dynamic>;
+
+  static Future<void> deletePayslip(int id) async =>
+      await request('DELETE', '/payslips/$id');
+
+  static Future<Map<String, dynamic>> uploadPayslipPdf(int id, File pdf) async =>
+      await uploadFile('/payslips/$id/pdf', pdf, 'pdf') as Map<String, dynamic>;
+
+  static Future<Uint8List> downloadPayslipPdf(int id) =>
+      downloadBytes('/payslips/$id/pdf');
+
   // ── Pointage ─────────────────────────────────────────────────────────────────
 
   static Future<Map<String, dynamic>> getAttendances({String? params}) async =>
@@ -378,7 +399,7 @@ class ApiService {
   static Future<void> markAllRead() async =>
       await request('POST', '/notifications/mark-all-read');
 
-  static Future<void> markRead(int id) async =>
+  static Future<void> markRead(String id) async =>
       await request('POST', '/notifications/$id/read');
 
   // ── Jours fériés ─────────────────────────────────────────────────────────────
@@ -388,4 +409,48 @@ class ApiService {
 
   static Future<void> declareHoliday(Map<String, dynamic> data) async =>
       await request('POST', '/attendance/declare-holiday', body: data);
+
+  // ── FCM ──────────────────────────────────────────────────────────────────────
+
+  static Future<void> saveFcmToken(String token) async =>
+      await request('POST', '/auth/fcm-token', body: {'fcm_token': token});
+
+  // ── Messagerie privée ─────────────────────────────────────────────────────────
+
+  static Future<List<dynamic>> getConversations() async =>
+      await request('GET', '/messages/conversations') as List<dynamic>;
+
+  static Future<List<dynamic>> getChatUsers() async =>
+      await request('GET', '/messages/users') as List<dynamic>;
+
+  static Future<List<dynamic>> getMessages(int userId) async =>
+      await request('GET', '/messages/$userId') as List<dynamic>;
+
+  static Future<Map<String, dynamic>> sendMessage(int userId, String body) async =>
+      await request('POST', '/messages/$userId', body: {'body': body}) as Map<String, dynamic>;
+
+  static Future<int> getUnreadMessagesCount() async {
+    final data = await request('GET', '/messages/unread-count') as Map<String, dynamic>;
+    return (data['count'] as num?)?.toInt() ?? 0;
+  }
+
+  static Future<Map<String, dynamic>> editMessage(int msgId, String body) async =>
+      await request('PUT', '/messages/$msgId', body: {'body': body}) as Map<String, dynamic>;
+
+  static Future<void> deleteMessage(int msgId) async =>
+      await request('DELETE', '/messages/$msgId');
+
+  // ── Annonces ─────────────────────────────────────────────────────────────────
+
+  static Future<List<dynamic>> getAnnouncements() async =>
+      await request('GET', '/announcements') as List<dynamic>;
+
+  static Future<Map<String, dynamic>> createAnnouncement(Map<String, dynamic> data) async =>
+      await request('POST', '/announcements', body: data) as Map<String, dynamic>;
+
+  static Future<Map<String, dynamic>> editAnnouncement(int id, Map<String, dynamic> data) async =>
+      await request('PUT', '/announcements/$id', body: data) as Map<String, dynamic>;
+
+  static Future<void> deleteAnnouncement(int id) async =>
+      await request('DELETE', '/announcements/$id');
 }

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
+import 'fcm_service.dart';
 
 class AuthService {
   static Map<String, dynamic>? _user;
@@ -45,11 +46,13 @@ class AuthService {
     await prefs.setString('auth_token', _token ?? '');
     await prefs.setString('auth_user', jsonEncode(_user));
     await ApiService.saveToken(_token ?? '');
+    await FcmService.init();
   }
 
   // ── Logout ───────────────────────────────────────────────────────────────────
 
   static Future<void> logout() async {
+    await FcmService.deleteFcmToken();
     try { await ApiService.logout(); } catch (_) {}
     await clearSession();
   }

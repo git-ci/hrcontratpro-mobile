@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import 'services/auth_service.dart';
 import 'services/api_service.dart';
 import 'services/checkin_reminder_service.dart';
+import 'services/fcm_service.dart';
 import 'theme/app_theme.dart';
 import 'widgets/app_drawer.dart';
 
@@ -20,9 +22,13 @@ import 'screens/attendance/attendance_screen.dart';
 import 'screens/contracts/contracts_screen.dart';
 import 'screens/requests/requests_screen.dart';
 import 'screens/leaves/leaves_screen.dart';
+import 'screens/payslips/payslips_screen.dart';
+import 'screens/messaging/messaging_screen.dart';
+import 'screens/messaging/chat_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   await AuthService.loadFromStorage();
   await CheckinReminderService.init();
 
@@ -36,6 +42,7 @@ void main() async {
   if (AuthService.isLoggedIn) {
     await CheckinReminderService.requestPermissions();
     CheckinReminderService.scheduleReminders();
+    await FcmService.init();
   }
 
   runApp(const HrContratProApp());
@@ -84,7 +91,6 @@ final _router = GoRouter(
             path: '/dg/notifications',
             builder: (_, __) => const NotificationsScreen()),
         GoRoute(path: '/dg/scan', builder: (_, __) => const QrScanScreen()),
-        // Autres routes DG → placeholder pour extension future
         GoRoute(
             path: '/dg/contracts', builder: (_, __) => const ContractsScreen()),
         GoRoute(
@@ -93,6 +99,16 @@ final _router = GoRouter(
         GoRoute(
             path: '/dg/attendance',
             builder: (_, __) => const AttendanceScreen()),
+        GoRoute(
+            path: '/dg/payslips', builder: (_, __) => const PayslipsScreen()),
+        GoRoute(path: '/dg/messaging', builder: (_, __) => const MessagingScreen()),
+        GoRoute(
+          path: '/dg/messaging/chat/:userId',
+          builder: (_, s) => ChatScreen(
+            partnerId:   int.parse(s.pathParameters['userId']!),
+            partnerName: s.extra as String? ?? '',
+          ),
+        ),
       ],
     ),
 
@@ -127,6 +143,16 @@ final _router = GoRouter(
         GoRoute(
             path: '/rh/attendance',
             builder: (_, __) => const AttendanceScreen()),
+        GoRoute(
+            path: '/rh/payslips', builder: (_, __) => const PayslipsScreen()),
+        GoRoute(path: '/rh/messaging', builder: (_, __) => const MessagingScreen()),
+        GoRoute(
+          path: '/rh/messaging/chat/:userId',
+          builder: (_, s) => ChatScreen(
+            partnerId:   int.parse(s.pathParameters['userId']!),
+            partnerName: s.extra as String? ?? '',
+          ),
+        ),
       ],
     ),
 
@@ -148,6 +174,16 @@ final _router = GoRouter(
         GoRoute(
             path: '/emp/attendance',
             builder: (_, __) => const AttendanceScreen()),
+        GoRoute(path: '/emp/messaging', builder: (_, __) => const MessagingScreen()),
+        GoRoute(
+          path: '/emp/messaging/chat/:userId',
+          builder: (_, s) => ChatScreen(
+            partnerId:   int.parse(s.pathParameters['userId']!),
+            partnerName: s.extra as String? ?? '',
+          ),
+        ),
+        GoRoute(
+            path: '/emp/payslips', builder: (_, __) => const PayslipsScreen()),
       ],
     ),
   ],
@@ -166,33 +202,82 @@ class HrContratProApp extends StatelessWidget {
 }
 
 // ── Shell avec BottomNav selon le rôle ────────────────────────────────────────
-class _RoleShell extends StatelessWidget {
+class _RoleShell extends StatefulWidget {
   final String role;
   final Widget child;
-
   const _RoleShell({required this.role, required this.child});
+  @override
+  State<_RoleShell> createState() => _RoleShellState();
+}
+
+class _RoleShellState extends State<_RoleShell> {
+  int _unread    = 0;
+  int _unreadMsg = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshAll();
+  }
+
+  Future<void> _refreshAll() async {
+    await Future.wait([_refreshUnread(), _refreshUnreadMsg()]);
+  }
+
+  Future<void> _refreshUnread() async {
+    try {
+      final n = await ApiService.getUnreadCount();
+      if (mounted) setState(() => _unread = n);
+    } catch (_) {}
+  }
+
+  Future<void> _refreshUnreadMsg() async {
+    try {
+      final n = await ApiService.getUnreadMessagesCount();
+      if (mounted) setState(() => _unreadMsg = n);
+    } catch (_) {}
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Rafraîchit les badges à chaque changement de route
+    _refreshAll();
+  }
 
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
-    final items = _navItems(role);
-    final idx = items.indexWhere((i) => location.startsWith(i.route));
+    final items    = _navItems(widget.role);
+    final idx      = items.indexWhere((i) => location.startsWith(i.route));
 
     return Scaffold(
-      drawer: AppDrawer(role: role),
+      drawer: AppDrawer(role: widget.role),
       body: Builder(
         builder: (ctx) => ShellScope(
           openDrawer: () => Scaffold.of(ctx).openDrawer(),
-          child: child,
+          child: widget.child,
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: idx < 0 ? 0 : idx,
         onTap: (i) => context.go(items[i].route),
-        items: items
-            .map((i) =>
-                BottomNavigationBarItem(icon: Icon(i.icon), label: i.label))
-            .toList(),
+        items: items.map((i) {
+          final isNotif = i.route.endsWith('/notifications');
+          final isMsg   = i.route.endsWith('/messaging');
+          final count   = isNotif ? _unread : (isMsg ? _unreadMsg : 0);
+          final icon = count > 0
+              ? Badge(
+                  label: Text(
+                    count > 99 ? '99+' : '$count',
+                    style: const TextStyle(fontSize: 9, color: Colors.white),
+                  ),
+                  backgroundColor: Colors.red,
+                  child: Icon(i.icon),
+                )
+              : Icon(i.icon);
+          return BottomNavigationBarItem(icon: icon, label: i.label);
+        }).toList(),
       ),
     );
   }
@@ -201,30 +286,27 @@ class _RoleShell extends StatelessWidget {
     switch (role) {
       case 'dg':
         return [
-          _NavItem('/$role/dashboard', Icons.dashboard_outlined, 'Tableau'),
-          _NavItem('/$role/employees', Icons.people_outline, 'Employés'),
-          _NavItem('/$role/attendance', Icons.schedule, 'Pointage'),
-          _NavItem('/$role/requests', Icons.assignment_outlined, 'Demandes'),
-          _NavItem(
-              '/$role/notifications', Icons.notifications_outlined, 'Notifs'),
+          _NavItem('/$role/dashboard',      Icons.dashboard_outlined,     'Tableau'),
+          _NavItem('/$role/employees',      Icons.people_outline,         'Employés'),
+          _NavItem('/$role/messaging',      Icons.forum_outlined,         'Messages'),
+          _NavItem('/$role/requests',       Icons.assignment_outlined,    'Demandes'),
+          _NavItem('/$role/notifications',  Icons.notifications_outlined, 'Notifs'),
         ];
       case 'rh':
         return [
-          _NavItem('/$role/dashboard', Icons.dashboard_outlined, 'Tableau'),
-          _NavItem('/$role/employees', Icons.people_outline, 'Employés'),
-          _NavItem('/$role/attendance', Icons.schedule, 'Pointage'),
-          _NavItem('/$role/contracts', Icons.description_outlined, 'Contrats'),
-          _NavItem(
-              '/$role/notifications', Icons.notifications_outlined, 'Notifs'),
+          _NavItem('/$role/dashboard',      Icons.dashboard_outlined,     'Tableau'),
+          _NavItem('/$role/employees',      Icons.people_outline,         'Employés'),
+          _NavItem('/$role/messaging',      Icons.forum_outlined,         'Messages'),
+          _NavItem('/$role/contracts',      Icons.description_outlined,   'Contrats'),
+          _NavItem('/$role/notifications',  Icons.notifications_outlined, 'Notifs'),
         ];
       default:
         return [
-          _NavItem('/emp/dashboard', Icons.home_outlined, 'Accueil'),
-          _NavItem('/emp/scan', Icons.qr_code_scanner, 'Scanner'),
-          _NavItem('/emp/attendance', Icons.schedule, 'Pointage'),
-          _NavItem('/emp/contracts', Icons.description_outlined, 'Contrats'),
-          _NavItem(
-              '/emp/notifications', Icons.notifications_outlined, 'Notifs'),
+          const _NavItem('/emp/dashboard',      Icons.home_outlined,          'Accueil'),
+          const _NavItem('/emp/scan',           Icons.qr_code_scanner,        'Scanner'),
+          const _NavItem('/emp/messaging',      Icons.forum_outlined,         'Messages'),
+          const _NavItem('/emp/contracts',      Icons.description_outlined,   'Contrats'),
+          const _NavItem('/emp/notifications',  Icons.notifications_outlined, 'Notifs'),
         ];
     }
   }

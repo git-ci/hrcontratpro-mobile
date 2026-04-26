@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "969928579620",
+    "project_id": "hrcontrapro",
+    "storage_bucket": "hrcontrapro.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:969928579620:android:83bd3d028fbdc14dd616b1",
+        "android_client_info": {
+          "package_name": "ci.ivosoft.hrcontratpro"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyArIsNmcfBj38MRTOGCLZc5Nho9GeOjm9Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

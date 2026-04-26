@@ -216,32 +216,35 @@ class _AppDrawerState extends State<AppDrawer> {
     switch (prefix) {
       case 'dg':
         return const [
-          _DrawerItem('/dg/dashboard',      Icons.dashboard_outlined,    'Tableau de bord'),
-          _DrawerItem('/dg/employees',       Icons.people_outline,        'Employés'),
-          _DrawerItem('/dg/attendance',      Icons.schedule_outlined,     'Pointage'),
-          _DrawerItem('/dg/contracts',       Icons.description_outlined,  'Contrats'),
-          _DrawerItem('/dg/requests',        Icons.assignment_outlined,   'Demandes'),
-          _DrawerItem('/dg/leaves',          Icons.beach_access_outlined, 'Congés'),
-          _DrawerItem('/dg/notifications',   Icons.notifications_outlined,'Notifications'),
+          _DrawerItem('/dg/dashboard',    Icons.dashboard_outlined,     'Tableau de bord'),
+          _DrawerItem('/dg/employees',    Icons.people_outline,         'Employés'),
+          _DrawerItem('/dg/attendance',   Icons.schedule_outlined,      'Pointage'),
+          _DrawerItem('/dg/contracts',    Icons.description_outlined,   'Contrats'),
+          _DrawerItem('/dg/payslips',     Icons.receipt_long_outlined,  'Mon bulletin'),
+          _DrawerItem('/dg/requests',     Icons.assignment_outlined,    'Demandes'),
+          _DrawerItem('/dg/leaves',       Icons.beach_access_outlined,  'Congés'),
+          _DrawerItem('/dg/notifications',Icons.notifications_outlined, 'Notifications'),
         ];
       case 'rh':
         return const [
-          _DrawerItem('/rh/dashboard',      Icons.dashboard_outlined,    'Tableau de bord'),
-          _DrawerItem('/rh/employees',       Icons.people_outline,        'Employés'),
-          _DrawerItem('/rh/attendance',      Icons.schedule_outlined,     'Pointage'),
-          _DrawerItem('/rh/contracts',       Icons.description_outlined,  'Contrats'),
-          _DrawerItem('/rh/requests',        Icons.assignment_outlined,   'Demandes'),
-          _DrawerItem('/rh/leaves',          Icons.beach_access_outlined, 'Congés'),
-          _DrawerItem('/rh/notifications',   Icons.notifications_outlined,'Notifications'),
+          _DrawerItem('/rh/dashboard',    Icons.dashboard_outlined,     'Tableau de bord'),
+          _DrawerItem('/rh/employees',    Icons.people_outline,         'Employés'),
+          _DrawerItem('/rh/attendance',   Icons.schedule_outlined,      'Pointage'),
+          _DrawerItem('/rh/contracts',    Icons.description_outlined,   'Contrats'),
+          _DrawerItem('/rh/payslips',     Icons.receipt_long_outlined,  'Bulletins de salaire'),
+          _DrawerItem('/rh/requests',     Icons.assignment_outlined,    'Demandes'),
+          _DrawerItem('/rh/leaves',       Icons.beach_access_outlined,  'Congés'),
+          _DrawerItem('/rh/notifications',Icons.notifications_outlined, 'Notifications'),
         ];
       default: // emp
         return const [
-          _DrawerItem('/emp/dashboard',     Icons.home_outlined,         'Accueil'),
-          _DrawerItem('/emp/scan',           Icons.qr_code_scanner,      'Scanner QR'),
-          _DrawerItem('/emp/attendance',     Icons.schedule_outlined,     'Pointage'),
-          _DrawerItem('/emp/contracts',      Icons.description_outlined,  'Mes contrats'),
-          _DrawerItem('/emp/leaves',         Icons.beach_access_outlined, 'Mes congés'),
-          _DrawerItem('/emp/notifications',  Icons.notifications_outlined,'Notifications'),
+          _DrawerItem('/emp/dashboard',    Icons.home_outlined,          'Accueil'),
+          _DrawerItem('/emp/scan',         Icons.qr_code_scanner,        'Scanner QR'),
+          _DrawerItem('/emp/attendance',   Icons.schedule_outlined,      'Pointage'),
+          _DrawerItem('/emp/contracts',    Icons.description_outlined,   'Mes contrats'),
+          _DrawerItem('/emp/payslips',     Icons.receipt_long_outlined,  'Mes bulletins'),
+          _DrawerItem('/emp/leaves',       Icons.beach_access_outlined,  'Mes congés'),
+          _DrawerItem('/emp/notifications',Icons.notifications_outlined, 'Notifications'),
         ];
     }
   }
