@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'api_service.dart';
@@ -15,6 +16,10 @@ class FcmService {
 
   static const _channelId   = 'hrcontrat_push';
   static const _channelName = 'HrContratPro';
+
+  // Stream émis à chaque nouveau message privé reçu en premier plan
+  static final _newMsgController = StreamController<void>.broadcast();
+  static Stream<void> get onNewMessage => _newMsgController.stream;
 
   static Future<void> init() async {
     // Enregistrer le handler background
@@ -44,21 +49,26 @@ class FcmService {
     // Notification reçue quand l'app est au premier plan
     FirebaseMessaging.onMessage.listen((msg) {
       final notif = msg.notification;
-      if (notif == null) return;
-      _localNotif.show(
-        msg.hashCode,
-        notif.title,
-        notif.body,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-            importance: Importance.high,
-            priority: Priority.high,
+      if (notif != null) {
+        _localNotif.show(
+          msg.hashCode,
+          notif.title,
+          notif.body,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              _channelId,
+              _channelName,
+              importance: Importance.high,
+              priority: Priority.high,
+            ),
+            iOS: const DarwinNotificationDetails(),
           ),
-          iOS: const DarwinNotificationDetails(),
-        ),
-      );
+        );
+      }
+      // Signaler aux listeners (badge nav bar) qu'un nouveau message est arrivé
+      if (msg.data['type'] == 'private_message') {
+        _newMsgController.add(null);
+      }
     });
 
     // Envoyer le token FCM au backend

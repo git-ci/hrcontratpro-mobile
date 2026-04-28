@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -213,11 +214,24 @@ class _RoleShell extends StatefulWidget {
 class _RoleShellState extends State<_RoleShell> {
   int _unread    = 0;
   int _unreadMsg = 0;
+  StreamSubscription<void>? _fcmMsgSub;
+  Timer? _badgeTimer;
 
   @override
   void initState() {
     super.initState();
     _refreshAll();
+    // Rafraîchir le badge messages dès qu'une FCM de message privé arrive
+    _fcmMsgSub = FcmService.onNewMessage.listen((_) => _refreshUnreadMsg());
+    // Polling toutes les 30 s en fallback (FCM pas toujours fiable en background)
+    _badgeTimer = Timer.periodic(const Duration(seconds: 30), (_) => _refreshAll());
+  }
+
+  @override
+  void dispose() {
+    _fcmMsgSub?.cancel();
+    _badgeTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _refreshAll() async {

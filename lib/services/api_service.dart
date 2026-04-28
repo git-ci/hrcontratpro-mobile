@@ -141,7 +141,7 @@ class ApiService {
   static Future<Map<String, dynamic>> login(
           String email, String password) async =>
       await request('POST', '/auth/login',
-          body: {'email': email, 'password': password},
+          body: {'email': email, 'password': password, 'device_name': 'mobile'},
           auth: false) as Map<String, dynamic>;
 
   static Future<void> logout() async {

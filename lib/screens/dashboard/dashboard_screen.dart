@@ -21,7 +21,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Données supplémentaires pour les employés
   int _unreadCount   = 0;
   List<dynamic> _myPayslips  = [];
-  List<dynamic> _myAttRecs   = [];
+  Map<String, dynamic> _myAttStats = {};
   Map<String, dynamic>? _myLeave;
   List<dynamic> _announcements = [];
 
@@ -35,7 +35,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       int unread = 0;
       List<dynamic> payslips = [];
-      List<dynamic> attRecs  = [];
+      Map<String, dynamic> attStats = {};
       Map<String, dynamic>? leave;
 
       final announcements = await ApiService.getAnnouncements()
@@ -54,7 +54,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         unread   = (results[0] as int?) ?? 0;
         payslips = (results[1] as List<dynamic>?) ?? [];
         final attMap = results[2] as Map<String, dynamic>? ?? {};
-        attRecs  = (attMap['data'] as List<dynamic>?) ?? [];
+        attStats = (attMap['stats'] as Map<String, dynamic>?) ?? {};
         leave    = results[3] as Map<String, dynamic>?;
       } else {
         unread = await ApiService.getUnreadCount().catchError((_) => 0);
@@ -64,7 +64,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _stats         = s;
         _unreadCount   = unread;
         _myPayslips    = payslips;
-        _myAttRecs     = attRecs;
+        _myAttStats    = attStats;
         _myLeave       = leave;
         _announcements = announcements;
         _loading       = false;
@@ -351,14 +351,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildEmpStats(Map<String, dynamic> s) {
-    // Pointage du mois
-    final present = _myAttRecs
-        .where((r) => r is Map && (r['status'] == 'present' || r['status'] == 'mission'))
-        .length;
-    final absent = _myAttRecs
-        .where((r) => r is Map && r['status'] != 'present' && r['status'] != 'mission')
-        .length;
-    final total  = _myAttRecs.length;
+    // Pointage du mois — données pré-calculées par le backend
+    final present = (_myAttStats['present_count'] as num?)?.toInt() ?? 0;
+    final absent  = (_myAttStats['absent_count']  as num?)?.toInt() ?? 0;
+    final total   = (_myAttStats['total_records'] as num?)?.toInt() ?? 0;
+    final hours   = (_myAttStats['hours_worked']  as num?)?.toInt() ?? 0;
+    final rate    = (_myAttStats['presence_rate'] as num?)?.toDouble() ?? 0.0;
 
     // Contrat actif
     final contract = s['active_contract'] as Map<String, dynamic>?;
@@ -391,11 +389,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(width: 8),
           _MiniKpi(value: '$absent', label: 'Absences', color: AppTheme.danger),
           const SizedBox(width: 8),
-          _MiniKpi(value: '${(present * 8)}h', label: 'Heures', color: AppTheme.info),
+          _MiniKpi(value: '${hours}h', label: 'Heures', color: AppTheme.info),
           if (total > 0) ...[
             const SizedBox(width: 8),
             _MiniKpi(
-              value: '${(present / total * 100).toStringAsFixed(0)}%',
+              value: '${rate.toStringAsFixed(0)}%',
               label: 'Présence',
               color: AppTheme.primary,
             ),
