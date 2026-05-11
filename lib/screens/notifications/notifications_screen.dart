@@ -43,12 +43,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   String? _destFor(Map<String, dynamic> data) {
     final type   = data['type'] as String? ?? '';
     final prefix = _prefix;
-    if (type == 'payslip_uploaded')                       return '$prefix/payslips';
+    if (type == 'payslip_uploaded')                            return '$prefix/payslips';
     if (type == 'contract_expiry' || type == 'contract_created') return '$prefix/contracts';
-    if (type == 'contract_request')                       return '$prefix/requests';
-    if (type == 'contract_decision')                      return AuthService.isEmp ? '/emp/contracts' : '$prefix/requests';
-    if (type == 'absence_detected')                       return '$prefix/attendance';
-    if (type.startsWith('leave_plan_'))                   return '$prefix/leaves';
+    if (type == 'contract_request')                            return '$prefix/requests';
+    if (type == 'contract_decision')                           return AuthService.isEmp ? '/emp/contracts' : '$prefix/requests';
+    if (type == 'absence_detected')                            return '$prefix/attendance';
+    if (type.startsWith('leave_plan_'))                        return '$prefix/leaves';
+    if (type == 'permission_request_submitted' ||
+        type == 'permission_request_decision')                 return '$prefix/permissions';
     return null;
   }
 
@@ -226,26 +228,30 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   bool _hasNavigation(String? type) {
     if (type == null) return false;
-    return type == 'payslip_uploaded'  ||
-           type == 'contract_expiry'   ||
-           type == 'contract_created'  ||
-           type == 'contract_request'  ||
-           type == 'contract_decision' ||
-           type == 'absence_detected'  ||
+    return type == 'payslip_uploaded'             ||
+           type == 'contract_expiry'              ||
+           type == 'contract_created'             ||
+           type == 'contract_request'             ||
+           type == 'contract_decision'            ||
+           type == 'absence_detected'             ||
+           type == 'permission_request_submitted' ||
+           type == 'permission_request_decision'  ||
            type.startsWith('leave_plan_');
   }
 
   static const _iconMap = {
-    'file-text'      : '📄',
-    'check-circle'   : '✅',
-    'x-circle'       : '❌',
-    'bell'           : '🔔',
-    'alert-triangle' : '⚠️',
-    'calendar'       : '📅',
-    'user'           : '👤',
-    'clock'          : '🕐',
-    'info'           : 'ℹ️',
-    'receipt'        : '🧾',
+    'file-text'            : '📄',
+    'check-circle'         : '✅',
+    'x-circle'             : '❌',
+    'bell'                 : '🔔',
+    'alert-triangle'       : '⚠️',
+    'calendar'             : '📅',
+    'user'                 : '👤',
+    'clock'                : '🕐',
+    'info'                 : 'ℹ️',
+    'receipt'              : '🧾',
+    'assignment'           : '📋',
+    'assignment_turned_in' : '📋',
   };
 
   String _resolveIcon(String? raw) {

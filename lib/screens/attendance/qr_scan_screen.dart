@@ -109,10 +109,12 @@ class _QrScanScreenState extends State<QrScanScreen> {
           msg.contains('téléphone') ||
           msg.contains('refusé');
       await Future.delayed(Duration(seconds: isImportant ? 10 : 4));
-      if (mounted) setState(() {
-        _message = null;
-        _processing = false;
-      });
+      if (mounted) {
+        setState(() {
+          _message = null;
+          _processing = false;
+        });
+      }
     }
   }
 

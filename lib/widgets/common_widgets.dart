@@ -107,7 +107,7 @@ class EmployeeCard extends StatelessWidget {
               Text('$pos${dept.isNotEmpty ? ' · $dept' : ''}',
                   style: const TextStyle(fontSize: 12)),
             if (mat.isNotEmpty)
-              Text('🪪 $mat', style: const TextStyle(fontSize: 11, color: AppTheme.info)),
+              Text('# $mat', style: const TextStyle(fontSize: 11, color: AppTheme.info)),
           ],
         ),
         trailing: Container(

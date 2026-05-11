@@ -28,6 +28,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   String _gender = 'M';
   String _role = 'employee';
   DateTime? _birthDate;
+  int? _managerId;
+  List<Map<String, dynamic>> _managers = [];
   bool _obscurePw = true;
   bool _obscurePw2 = true;
   bool _loading = false;
@@ -37,7 +39,18 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   @override
   void initState() {
     super.initState();
+    _loadManagers();
     if (_isEdit) _loadUser();
+  }
+
+  Future<void> _loadManagers() async {
+    try {
+      final res = await ApiService.getUsers(perPage: 999);
+      final data = res['data'] as List<dynamic>? ?? [];
+      if (mounted) {
+        setState(() => _managers = data.cast<Map<String, dynamic>>());
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadUser() async {
@@ -53,6 +66,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       _position.text = u['position'] ?? '';
       _gender = u['gender'] ?? 'M';
       _role = u['role'] ?? 'employee';
+      _managerId = u['manager_id'] as int?;
       if (u['birth_date'] != null) {
         try {
           _birthDate = DateTime.parse(u['birth_date']);
@@ -99,6 +113,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         'position': _position.text.trim(),
         'gender': _gender,
         'role': _role,
+        'manager_id': _managerId,
         if (_birthDate != null)
           'birth_date': '${_birthDate!.year}-'
               '${_birthDate!.month.toString().padLeft(2, '0')}-'
@@ -210,6 +225,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                           },
                           (v) => setState(() => _role = v!)),
                     ],
+                    const SizedBox(height: 12),
+                    _managerDropdown(),
 
                     const SizedBox(height: 8),
 
@@ -359,6 +376,28 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
             .toList(),
         onChanged: onChange,
       );
+
+  Widget _managerDropdown() {
+    final items = <DropdownMenuItem<int?>>[
+      const DropdownMenuItem(value: null, child: Text('— DG (par défaut) —')),
+      ..._managers
+          .where((u) => u['id'] != widget.userId)
+          .map((u) => DropdownMenuItem<int?>(
+                value: u['id'] as int?,
+                child: Text('${u['name']}', overflow: TextOverflow.ellipsis),
+              )),
+    ];
+    return DropdownButtonFormField<int?>(
+      value: _managerId,
+      decoration: const InputDecoration(
+        labelText: 'Responsable hiérarchique',
+        prefixIcon: Icon(Icons.supervisor_account_outlined, size: 18),
+        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      ),
+      items: items,
+      onChanged: (v) => setState(() => _managerId = v),
+    );
+  }
 
   Widget _datePicker() => GestureDetector(
         onTap: () async {

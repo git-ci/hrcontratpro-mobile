@@ -275,7 +275,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                         color: Colors.white.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Text('🪪 ${u['matricule']}',
+                      child: Text('# ${u['matricule']}',
                           style: const TextStyle(
                               color: Colors.white,
                               fontSize: 11,

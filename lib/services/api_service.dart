@@ -197,9 +197,9 @@ class ApiService {
   // ── Employés ─────────────────────────────────────────────────────────────────
 
   static Future<Map<String, dynamic>> getUsers(
-          {String? query, int page = 1}) async =>
+          {String? query, int page = 1, int perPage = 15}) async =>
       await request('GET',
-              '/users?page=$page${query != null ? '&search=$query' : ''}')
+              '/users?page=$page&per_page=$perPage${query != null ? '&search=$query' : ''}')
           as Map<String, dynamic>;
 
   static Future<Map<String, dynamic>> getUser(int id) async =>
@@ -453,4 +453,100 @@ class ApiService {
 
   static Future<void> deleteAnnouncement(int id) async =>
       await request('DELETE', '/announcements/$id');
+
+  // ── Demandes de permission ────────────────────────────────────────────────
+
+  static Future<Map<String, dynamic>> getPermissionRequests(
+          {String? status, int? userId}) async {
+    final params = <String>[];
+    if (status != null) params.add('status=$status');
+    if (userId != null) params.add('user_id=$userId');
+    final qs = params.isNotEmpty ? '?${params.join('&')}' : '';
+    return await request('GET', '/permission-requests$qs') as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> getPermissionRequest(int id) async =>
+      await request('GET', '/permission-requests/$id') as Map<String, dynamic>;
+
+  static Future<Map<String, dynamic>> createPermissionRequest(
+      Map<String, dynamic> data, {File? justificatif}) async {
+    if (justificatif != null) {
+      return _postPermissionWithFile('/permission-requests', data, justificatif);
+    }
+    return await request('POST', '/permission-requests', body: data)
+        as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> updatePermissionRequest(
+      int id, Map<String, dynamic> data, {File? justificatif}) async {
+    if (justificatif != null) {
+      return _postPermissionWithFile('/permission-requests/$id/update', data, justificatif);
+    }
+    return await request('POST', '/permission-requests/$id/update', body: data)
+        as Map<String, dynamic>;
+  }
+
+  static Future<void> deletePermissionRequest(int id) async =>
+      await request('DELETE', '/permission-requests/$id');
+
+  static Future<Map<String, dynamic>> resubmitPermissionRequest(
+      int id, Map<String, dynamic> data, {File? justificatif}) async {
+    if (justificatif != null) {
+      return _postPermissionWithFile(
+          '/permission-requests/$id/resubmit', data, justificatif);
+    }
+    return await request('POST', '/permission-requests/$id/resubmit', body: data)
+        as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> _postPermissionWithFile(
+      String endpoint, Map<String, dynamic> data, File file) async {
+    final base  = _base;
+    final token = await getToken();
+    final req   = http.MultipartRequest('POST', Uri.parse('$base$endpoint'));
+    if (token != null) req.headers['Authorization'] = 'Bearer $token';
+    req.headers['Accept'] = 'application/json';
+    data.forEach((key, value) {
+      if (value != null) req.fields[key] = value.toString();
+    });
+    req.files.add(await http.MultipartFile.fromPath('justificatif', file.path));
+    final streamed  = await req.send().timeout(const Duration(seconds: 60));
+    final response  = await http.Response.fromStream(streamed);
+    final json      = jsonDecode(utf8.decode(response.bodyBytes));
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return Map<String, dynamic>.from(json as Map);
+    }
+    final msg = (json is Map && json['message'] != null)
+        ? json['message'] as String
+        : 'Erreur upload';
+    if (response.statusCode == 401) {
+      await clearToken();
+      onUnauthorized?.call();
+    }
+    throw ApiException(msg, statusCode: response.statusCode);
+  }
+
+  static Future<void> managerDecidePermission(
+          int id, Map<String, dynamic> data) async =>
+      await request('POST', '/permission-requests/$id/manager-decide',
+          body: data);
+
+  static Future<void> dgDecidePermission(
+          int id, Map<String, dynamic> data) async =>
+      await request('POST', '/permission-requests/$id/dg-decide', body: data);
+
+  static Future<String> getPermissionDocument(int id) async {
+    final token = await getToken();
+    final response = await http.get(
+      Uri.parse('$_base/permission-requests/$id/document'),
+      headers: {
+        if (token != null) 'Authorization': 'Bearer $token',
+        'Accept': 'text/html',
+      },
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Impossible de charger le document.');
+    }
+    return response.body;
+  }
 }

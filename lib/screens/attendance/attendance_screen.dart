@@ -8,6 +8,7 @@ import '../../widgets/common_widgets.dart';
 
 const _statuses = {
   'present': {'label': 'Présence', 'icon': '✅', 'color': AppTheme.success},
+  'retard':  {'label': 'Retard',   'icon': '⏰', 'color': AppTheme.warning},
   'absent': {'label': 'Absence', 'icon': '❌', 'color': AppTheme.danger},
   'sick': {'label': 'Maladie', 'icon': '🏥', 'color': AppTheme.info},
   'maternity': {'label': 'Maternité', 'icon': '🤱', 'color': AppTheme.info},

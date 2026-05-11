@@ -26,6 +26,7 @@ import 'screens/leaves/leaves_screen.dart';
 import 'screens/payslips/payslips_screen.dart';
 import 'screens/messaging/messaging_screen.dart';
 import 'screens/messaging/chat_screen.dart';
+import 'screens/permissions/permissions_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -110,6 +111,7 @@ final _router = GoRouter(
             partnerName: s.extra as String? ?? '',
           ),
         ),
+        GoRoute(path: '/dg/permissions', builder: (_, __) => const PermissionsScreen()),
       ],
     ),
 
@@ -154,6 +156,7 @@ final _router = GoRouter(
             partnerName: s.extra as String? ?? '',
           ),
         ),
+        GoRoute(path: '/rh/permissions', builder: (_, __) => const PermissionsScreen()),
       ],
     ),
 
@@ -183,6 +186,7 @@ final _router = GoRouter(
             partnerName: s.extra as String? ?? '',
           ),
         ),
+        GoRoute(path: '/emp/permissions', builder: (_, __) => const PermissionsScreen()),
         GoRoute(
             path: '/emp/payslips', builder: (_, __) => const PayslipsScreen()),
       ],
@@ -303,7 +307,7 @@ class _RoleShellState extends State<_RoleShell> {
           _NavItem('/$role/dashboard',      Icons.dashboard_outlined,     'Tableau'),
           _NavItem('/$role/employees',      Icons.people_outline,         'Employés'),
           _NavItem('/$role/messaging',      Icons.forum_outlined,         'Messages'),
-          _NavItem('/$role/requests',       Icons.assignment_outlined,    'Demandes'),
+          _NavItem('/$role/permissions',    Icons.event_note_outlined,    'Permissions'),
           _NavItem('/$role/notifications',  Icons.notifications_outlined, 'Notifs'),
         ];
       case 'rh':
@@ -311,7 +315,7 @@ class _RoleShellState extends State<_RoleShell> {
           _NavItem('/$role/dashboard',      Icons.dashboard_outlined,     'Tableau'),
           _NavItem('/$role/employees',      Icons.people_outline,         'Employés'),
           _NavItem('/$role/messaging',      Icons.forum_outlined,         'Messages'),
-          _NavItem('/$role/contracts',      Icons.description_outlined,   'Contrats'),
+          _NavItem('/$role/permissions',    Icons.event_note_outlined,    'Permissions'),
           _NavItem('/$role/notifications',  Icons.notifications_outlined, 'Notifs'),
         ];
       default:
@@ -319,7 +323,7 @@ class _RoleShellState extends State<_RoleShell> {
           const _NavItem('/emp/dashboard',      Icons.home_outlined,          'Accueil'),
           const _NavItem('/emp/scan',           Icons.qr_code_scanner,        'Scanner'),
           const _NavItem('/emp/messaging',      Icons.forum_outlined,         'Messages'),
-          const _NavItem('/emp/contracts',      Icons.description_outlined,   'Contrats'),
+          const _NavItem('/emp/permissions',    Icons.event_note_outlined,    'Permissions'),
           const _NavItem('/emp/notifications',  Icons.notifications_outlined, 'Notifs'),
         ];
     }

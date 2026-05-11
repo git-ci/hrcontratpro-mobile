@@ -23,6 +23,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<dynamic> _myPayslips  = [];
   Map<String, dynamic> _myAttStats = {};
   Map<String, dynamic>? _myLeave;
+  Map<String, dynamic>? _lastPermission;
   List<dynamic> _announcements = [];
 
   @override
@@ -31,44 +32,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final s = await ApiService.getDashboard();
-
-      int unread = 0;
-      List<dynamic> payslips = [];
-      Map<String, dynamic> attStats = {};
-      Map<String, dynamic>? leave;
-
-      final announcements = await ApiService.getAnnouncements()
-          .catchError((_) => <dynamic>[]);
-
       if (AuthService.isEmp) {
-        final now = DateTime.now();
         final results = await Future.wait([
+          ApiService.getDashboard(),
+          ApiService.getAnnouncements().catchError((_) => <dynamic>[]),
           ApiService.getUnreadCount().catchError((_) => 0),
           ApiService.getMyPayslips().catchError((_) => <dynamic>[]),
-          ApiService.getMyAttendance(
-            params: '?month=${now.month}&year=${now.year}',
-          ).catchError((_) => <String, dynamic>{}),
           ApiService.getMyLeavePlan().catchError((_) => <String, dynamic>{}),
+          ApiService.getPermissionRequests().catchError((_) => <String, dynamic>{}),
         ]);
-        unread   = (results[0] as int?) ?? 0;
-        payslips = (results[1] as List<dynamic>?) ?? [];
-        final attMap = results[2] as Map<String, dynamic>? ?? {};
-        attStats = (attMap['stats'] as Map<String, dynamic>?) ?? {};
-        leave    = results[3] as Map<String, dynamic>?;
-      } else {
-        unread = await ApiService.getUnreadCount().catchError((_) => 0);
-      }
 
-      setState(() {
-        _stats         = s;
-        _unreadCount   = unread;
-        _myPayslips    = payslips;
-        _myAttStats    = attStats;
-        _myLeave       = leave;
-        _announcements = announcements;
-        _loading       = false;
-      });
+        final s             = results[0] as Map<String, dynamic>;
+        final announcements = (results[1] as List?)?.cast<dynamic>() ?? [];
+        final unread        = (results[2] as int?) ?? 0;
+        final payslips      = (results[3] as List?)?.cast<dynamic>() ?? [];
+        final leaveRaw      = results[4];
+        final leave         = leaveRaw is Map && leaveRaw.isNotEmpty
+            ? Map<String, dynamic>.from(leaveRaw)
+            : null;
+        final permRaw       = results[5];
+        final permList      = permRaw is Map ? (permRaw['data'] as List?) : null;
+        final lastPerm      = permList != null && permList.isNotEmpty
+            ? Map<String, dynamic>.from(permList.first as Map)
+            : null;
+
+        // Les stats de pointage viennent directement du getDashboard()
+        // pour éviter tout problème de timing avec un appel séparé.
+        final attStats = s['attendance_stats'] is Map
+            ? Map<String, dynamic>.from(s['attendance_stats'] as Map)
+            : <String, dynamic>{};
+
+        setState(() {
+          _stats           = s;
+          _unreadCount     = unread;
+          _myPayslips      = payslips;
+          _myAttStats      = attStats;
+          _myLeave         = leave;
+          _lastPermission  = lastPerm;
+          _announcements   = announcements;
+          _loading         = false;
+        });
+      } else {
+        final results = await Future.wait([
+          ApiService.getDashboard(),
+          ApiService.getAnnouncements().catchError((_) => <dynamic>[]),
+          ApiService.getUnreadCount().catchError((_) => 0),
+        ]);
+
+        setState(() {
+          _stats         = results[0] as Map<String, dynamic>;
+          _announcements = (results[1] as List?)?.cast<dynamic>() ?? [];
+          _unreadCount   = (results[2] as int?) ?? 0;
+          _loading       = false;
+        });
+      }
     } catch (e) {
       setState(() { _error = e.toString(); _loading = false; });
     }
@@ -327,6 +344,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   label: 'Mon pointage',
                   subtitle: 'Historique de présence',
                   onTap: () => context.go('/emp/attendance')),
+              _QuickActionTile(
+                  icon: Icons.event_note_outlined,
+                  label: 'Permissions',
+                  subtitle: 'Congés exceptionnels & autorisations d\'absence',
+                  onTap: () => context.go('/emp/permissions')),
             ]),
           ),
 
@@ -351,12 +373,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildEmpStats(Map<String, dynamic> s) {
-    // Pointage du mois — données pré-calculées par le backend
-    final present = (_myAttStats['present_count'] as num?)?.toInt() ?? 0;
-    final absent  = (_myAttStats['absent_count']  as num?)?.toInt() ?? 0;
-    final total   = (_myAttStats['total_records'] as num?)?.toInt() ?? 0;
-    final hours   = (_myAttStats['hours_worked']  as num?)?.toInt() ?? 0;
-    final rate    = (_myAttStats['presence_rate'] as num?)?.toDouble() ?? 0.0;
+    // Pointage du mois — données pré-calculées par le backend via getDashboard()
+    final present    = (_myAttStats['present_count'] as num?)?.toInt() ?? 0;
+    final retard     = (_myAttStats['retard_count']  as num?)?.toInt() ?? 0;
+    final absent     = (_myAttStats['absent_count']  as num?)?.toInt() ?? 0;
+    final hours      = (_myAttStats['hours_worked']  as num?)?.toInt() ?? 0;
+    final rate       = (_myAttStats['presence_rate'] as num?)?.toDouble() ?? 0.0;
+    final retardRate = (_myAttStats['retard_rate']   as num?)?.toDouble() ?? 0.0;
 
     // Contrat actif
     final contract = s['active_contract'] as Map<String, dynamic>?;
@@ -384,20 +407,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
         icon: Icons.schedule_outlined,
         title: 'Pointage ce mois',
         color: AppTheme.info,
-        child: Row(children: [
-          _MiniKpi(value: '$present', label: 'Présences', color: AppTheme.success),
-          const SizedBox(width: 8),
-          _MiniKpi(value: '$absent', label: 'Absences', color: AppTheme.danger),
-          const SizedBox(width: 8),
-          _MiniKpi(value: '${hours}h', label: 'Heures', color: AppTheme.info),
-          if (total > 0) ...[
-            const SizedBox(width: 8),
-            _MiniKpi(
-              value: '${rate.toStringAsFixed(0)}%',
-              label: 'Présence',
-              color: AppTheme.primary,
-            ),
-          ],
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            _MiniKpi(value: '$present', label: 'Présences', color: AppTheme.success),
+            const SizedBox(width: 12),
+            _MiniKpi(value: '$absent', label: 'Absences', color: AppTheme.danger),
+            const SizedBox(width: 12),
+            _MiniKpi(value: '$retard', label: 'Retards', color: AppTheme.warning),
+          ]),
+          const SizedBox(height: 10),
+          Row(children: [
+            _MiniKpi(value: '${hours}h', label: 'Heures', color: AppTheme.info),
+            const SizedBox(width: 12),
+            _MiniKpi(value: '${rate.toStringAsFixed(0)}%', label: 'Taux présence', color: AppTheme.primary),
+            const SizedBox(width: 12),
+            _MiniKpi(value: '${retardRate.toStringAsFixed(0)}%', label: 'Taux retard', color: AppTheme.warning),
+          ]),
         ]),
       ),
       const SizedBox(height: 10),
@@ -466,6 +491,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       const SizedBox(height: 10),
 
+      // Dernière demande de permission
+      if (_lastPermission != null)
+        GestureDetector(
+          onTap: () => context.go('/emp/permissions'),
+          child: _EmpStatCard(
+            icon: Icons.event_note_outlined,
+            title: 'Ma dernière demande de permission',
+            color: const Color(0xFF7048E8),
+            child: _buildPermissionInfo(_lastPermission!),
+          ),
+        ),
+      if (_lastPermission == null)
+        GestureDetector(
+          onTap: () => context.go('/emp/permissions'),
+          child: _EmpStatCard(
+            icon: Icons.event_note_outlined,
+            title: 'Demandes de permission',
+            color: const Color(0xFF7048E8),
+            child: const Row(children: [
+              Text('Aucune demande soumise',
+                  style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+              Spacer(),
+              Icon(Icons.add_circle_outline,
+                  size: 16, color: Color(0xFF7048E8)),
+              SizedBox(width: 4),
+              Text('Nouvelle',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF7048E8),
+                      fontWeight: FontWeight.w600)),
+            ]),
+          ),
+        ),
+      const SizedBox(height: 10),
+
       // Contrat + bulletins
       Row(children: [
         Expanded(
@@ -505,6 +563,88 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       ]),
+    ]);
+  }
+
+  Widget _buildPermissionInfo(Map<String, dynamic> p) {
+    const typeLabels = {
+      'conge_exceptionnel':   'Congé exceptionnel',
+      'autorisation_absence': "Autorisation d'absence",
+    };
+    const statusLabels = {
+      'pending_manager':        'Attente responsable',
+      'pending_dg':             'Attente DG',
+      'approved':               'Accordée',
+      'refused':                'Refusée',
+      'modification_requested': 'Modification requise',
+    };
+    const statusColors = {
+      'pending_manager':        AppTheme.warning,
+      'pending_dg':             Color(0xFFE67700),
+      'approved':               AppTheme.success,
+      'refused':                AppTheme.danger,
+      'modification_requested': Color(0xFF7048E8),
+    };
+
+    final type        = p['type'] as String? ?? '';
+    final status      = p['status'] as String? ?? '';
+    final isConge     = type == 'conge_exceptionnel';
+    final statusColor = statusColors[status] ?? AppTheme.textMuted;
+    final typeLabel   = typeLabels[type] ?? type;
+    final statusLabel = statusLabels[status] ?? status;
+
+    final dateDebut  = isConge ? p['date_debut']  : p['date_depart'];
+    final dateFin    = isConge ? p['date_fin']     : p['date_reprise'];
+    final duree      = !isConge
+        ? '${p['duree_valeur']} ${p['duree_unite'] == 'heure' ? 'h' : 'j'}'
+        : null;
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Expanded(
+          child: Text(typeLabel,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: statusColor.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(statusLabel,
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
+                  color: statusColor)),
+        ),
+        const SizedBox(width: 4),
+        const Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted),
+      ]),
+      const SizedBox(height: 6),
+      Row(children: [
+        const Icon(Icons.calendar_today, size: 11, color: AppTheme.textMuted),
+        const SizedBox(width: 4),
+        Text(
+          dateDebut != null && dateFin != null
+              ? '${_fmtDate(dateDebut.toString())} → ${_fmtDate(dateFin.toString())}'
+              : dateDebut != null ? _fmtDate(dateDebut.toString()) : '—',
+          style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+        ),
+        if (duree != null) ...[
+          const SizedBox(width: 8),
+          Text('· $duree',
+              style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+        ],
+      ]),
+      if (status == 'approved') ...[
+        const SizedBox(height: 6),
+        Row(children: [
+          const Icon(Icons.info_outline, size: 11, color: AppTheme.success),
+          const SizedBox(width: 4),
+          const Expanded(
+            child: Text('Accordée — passez au RH pour votre document',
+                style: TextStyle(fontSize: 10, color: AppTheme.success)),
+          ),
+        ]),
+      ],
     ]);
   }
 

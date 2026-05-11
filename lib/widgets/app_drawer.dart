@@ -223,6 +223,8 @@ class _AppDrawerState extends State<AppDrawer> {
           _DrawerItem('/dg/payslips',     Icons.receipt_long_outlined,  'Mon bulletin'),
           _DrawerItem('/dg/requests',     Icons.assignment_outlined,    'Demandes'),
           _DrawerItem('/dg/leaves',       Icons.beach_access_outlined,  'Congés'),
+          _DrawerItem('/dg/messaging',    Icons.forum_outlined,         'Messagerie'),
+          _DrawerItem('/dg/permissions',  Icons.event_note_outlined,    'Permissions'),
           _DrawerItem('/dg/notifications',Icons.notifications_outlined, 'Notifications'),
         ];
       case 'rh':
@@ -234,6 +236,8 @@ class _AppDrawerState extends State<AppDrawer> {
           _DrawerItem('/rh/payslips',     Icons.receipt_long_outlined,  'Bulletins de salaire'),
           _DrawerItem('/rh/requests',     Icons.assignment_outlined,    'Demandes'),
           _DrawerItem('/rh/leaves',       Icons.beach_access_outlined,  'Congés'),
+          _DrawerItem('/rh/messaging',    Icons.forum_outlined,         'Messagerie'),
+          _DrawerItem('/rh/permissions',  Icons.event_note_outlined,    'Permissions'),
           _DrawerItem('/rh/notifications',Icons.notifications_outlined, 'Notifications'),
         ];
       default: // emp
@@ -244,6 +248,8 @@ class _AppDrawerState extends State<AppDrawer> {
           _DrawerItem('/emp/contracts',    Icons.description_outlined,   'Mes contrats'),
           _DrawerItem('/emp/payslips',     Icons.receipt_long_outlined,  'Mes bulletins'),
           _DrawerItem('/emp/leaves',       Icons.beach_access_outlined,  'Mes congés'),
+          _DrawerItem('/emp/messaging',    Icons.forum_outlined,         'Messagerie'),
+          _DrawerItem('/emp/permissions',  Icons.event_note_outlined,    'Permissions'),
           _DrawerItem('/emp/notifications',Icons.notifications_outlined, 'Notifications'),
         ];
     }
