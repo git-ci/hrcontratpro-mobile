@@ -5,6 +5,7 @@ import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_drawer.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/announcement_banner.dart';
 
 class EmployeesScreen extends StatefulWidget {
   const EmployeesScreen({super.key});
@@ -73,6 +74,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         ],
       ),
       body: Column(children: [
+        const AnnouncementBanner(),
         // Recherche
         Padding(
           padding: const EdgeInsets.all(12),
@@ -178,19 +180,22 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
     final u = _user!;
     final isActive = u['status'] == 'active';
     try {
-      if (isActive)
+      if (isActive) {
         await ApiService.deactivateUser(u['id']);
-      else
+      } else {
         await ApiService.activateUser(u['id']);
+      }
       await _load();
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(isActive ? 'Compte désactivé' : 'Compte activé'),
             backgroundColor: AppTheme.success));
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(e.toString()), backgroundColor: AppTheme.danger));
+      }
     }
   }
 

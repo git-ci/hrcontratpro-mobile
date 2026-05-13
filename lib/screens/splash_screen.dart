@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../services/api_service.dart';
 import '../services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -30,12 +31,23 @@ class _SplashScreenState extends State<SplashScreen>
 
     _ctrl.forward();
 
-    Future.delayed(const Duration(milliseconds: 2200), () {
+    Future.delayed(const Duration(milliseconds: 2200), () async {
       if (!mounted) return;
+
       if (AuthService.isLoggedIn) {
         context.go(AuthService.initialRoute);
-      } else {
-        context.go('/login');
+        return;
+      }
+
+      // Vérifier si un compte DG existe déjà sur le serveur
+      try {
+        final status = await ApiService.checkSetup();
+        if (!mounted) return;
+        final setupRequired = status['setup_required'] as bool? ?? false;
+        context.go(setupRequired ? '/setup' : '/login');
+      } catch (_) {
+        // Serveur injoignable → login (affichera une erreur réseau)
+        if (mounted) context.go('/login');
       }
     });
   }

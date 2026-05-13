@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/checkin_reminder_service.dart';
+import '../../services/device_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/announcement_banner.dart';
 
 class QrScanScreen extends StatefulWidget {
   const QrScanScreen({super.key});
@@ -88,7 +90,8 @@ class _QrScanScreenState extends State<QrScanScreen> {
 
       // Mode scan normal → pointer directement
       await _controller.stop();
-      final result = await ApiService.scanQr(payload, signature);
+      final deviceId = await DeviceService.getDeviceId();
+      final result = await ApiService.scanQr(payload, signature, deviceId: deviceId);
       CheckinReminderService.cancelReminders();
       setState(() {
         _done = true;
@@ -151,8 +154,9 @@ class _QrScanScreenState extends State<QrScanScreen> {
     }
     setState(() => _processing = true);
     try {
-      final result =
-          await ApiService.scanMatricule(mat, _lastPayload!, _lastSignature!);
+      final deviceId = await DeviceService.getDeviceId();
+      final result = await ApiService.scanMatricule(
+          mat, _lastPayload!, _lastSignature!, deviceId: deviceId);
       setState(() {
         _done = true;
         _success = true;
@@ -187,7 +191,12 @@ class _QrScanScreenState extends State<QrScanScreen> {
           onPressed: () => context.go('/$prefix/attendance'),
         ),
       ),
-      body: _done ? _buildResult() : _buildScanner(),
+      body: Column(
+        children: [
+          const AnnouncementBanner(),
+          Expanded(child: _done ? _buildResult() : _buildScanner()),
+        ],
+      ),
     );
   }
 

@@ -38,14 +38,22 @@ class AuthService {
 
   static Future<void> login(String email, String password) async {
     final data = await ApiService.login(email, password);
-    _token = data['token'] as String?;
-    _user  = data['user'] as Map<String, dynamic>?;
-    _role  = _user?['role'] as String?;
+    await saveSession(
+      data['token'] as String,
+      data['user']  as Map<String, dynamic>,
+    );
+  }
+
+  /// Persiste un token + user déjà obtenus (setup DG, refresh, etc.)
+  static Future<void> saveSession(String token, Map<String, dynamic> user) async {
+    _token = token;
+    _user  = user;
+    _role  = user['role'] as String?;
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('auth_token', _token ?? '');
-    await prefs.setString('auth_user', jsonEncode(_user));
-    await ApiService.saveToken(_token ?? '');
+    await prefs.setString('auth_token', token);
+    await prefs.setString('auth_user', jsonEncode(user));
+    await ApiService.saveToken(token);
     await FcmService.init();
   }
 

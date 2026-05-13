@@ -8,6 +8,7 @@ import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_drawer.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/announcement_banner.dart';
 
 // ── Statuts ──────────────────────────────────────────────────────────────────
 const _contractStatuses = {
@@ -107,16 +108,20 @@ class _ContractsScreenState extends State<ContractsScreen>
                 ],
               ),
       ),
-      body: _loading
-          ? const LoadingWidget()
-          : _error != null
-              ? ErrorWidget2(message: _error!, onRetry: _load)
-              : _contracts.isEmpty
-                  ? const EmptyWidget(icon: '📄', title: 'Aucun contrat trouvé')
-                  : RefreshIndicator(
-                      onRefresh: () => _load(status: _filterStatus),
-                      child: ListView.builder(
-                        itemCount: _contracts.length,
+      body: Column(
+        children: [
+          const AnnouncementBanner(),
+          Expanded(
+            child: _loading
+                ? const LoadingWidget()
+                : _error != null
+                    ? ErrorWidget2(message: _error!, onRetry: _load)
+                    : _contracts.isEmpty
+                        ? const EmptyWidget(icon: '📄', title: 'Aucun contrat trouvé')
+                        : RefreshIndicator(
+                            onRefresh: () => _load(status: _filterStatus),
+                            child: ListView.builder(
+                              itemCount: _contracts.length,
                         itemBuilder: (_, i) => _ContractCard(
                           contract: _contracts[i] as Map<String, dynamic>,
                           onTap: () => _showDetail(
@@ -124,6 +129,9 @@ class _ContractsScreenState extends State<ContractsScreen>
                         ),
                       ),
                     ),
+          ),
+        ],
+      ),
     );
   }
 

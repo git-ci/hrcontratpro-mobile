@@ -8,6 +8,7 @@ import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_drawer.dart';
+import '../../widgets/announcement_banner.dart';
 
 const List<String> _months = [
   '', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -70,7 +71,12 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
           ),
         ],
       ),
-      body: _buildBody(),
+      body: Column(
+        children: [
+          const AnnouncementBanner(),
+          Expanded(child: _buildBody()),
+        ],
+      ),
     );
   }
 

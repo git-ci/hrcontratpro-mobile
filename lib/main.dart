@@ -12,6 +12,7 @@ import 'widgets/app_drawer.dart';
 
 // Screens
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/setup_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/employees/employees_screen.dart';
@@ -56,8 +57,8 @@ final _router = GoRouter(
   redirect: (ctx, state) async {
     final loggedIn = AuthService.isLoggedIn;
     final loc = state.matchedLocation;
-    final isSplash  = loc == '/';
-    final isAuthPage = loc == '/login';
+    final isSplash   = loc == '/';
+    final isAuthPage = loc == '/login' || loc == '/setup';
 
     if (isSplash) return null; // Le splash gère lui-même la navigation
     if (!loggedIn && !isAuthPage) return '/login';
@@ -66,8 +67,9 @@ final _router = GoRouter(
   },
   routes: [
     // ── Auth ────────────────────────────────────────────────────────────────
-    GoRoute(path: '/', builder: (_, __) => const SplashScreen()),
+    GoRoute(path: '/',      builder: (_, __) => const SplashScreen()),
     GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+    GoRoute(path: '/setup', builder: (_, __) => const SetupScreen()),
     GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
 
     // ── DG Shell ────────────────────────────────────────────────────────────

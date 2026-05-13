@@ -5,10 +5,11 @@ import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_drawer.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/announcement_banner.dart';
 
 const _statuses = {
   'present': {'label': 'Présence', 'icon': '✅', 'color': AppTheme.success},
-  'retard':  {'label': 'Retard',   'icon': '⏰', 'color': AppTheme.warning},
+  'retard': {'label': 'Retard', 'icon': '⏰', 'color': AppTheme.warning},
   'absent': {'label': 'Absence', 'icon': '❌', 'color': AppTheme.danger},
   'sick': {'label': 'Maladie', 'icon': '🏥', 'color': AppTheme.info},
   'maternity': {'label': 'Maternité', 'icon': '🤱', 'color': AppTheme.info},
@@ -80,12 +81,19 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 ],
               ),
       ),
-      body: AuthService.isEmp
-          ? const _MyAttendanceTab()
-          : TabBarView(controller: _tabs, children: const [
-              _DailyEntryTab(),
-              _HistoryTab(),
-            ]),
+      body: Column(
+        children: [
+          const AnnouncementBanner(),
+          Expanded(
+            child: AuthService.isEmp
+                ? const _MyAttendanceTab()
+                : TabBarView(controller: _tabs, children: const [
+                    _DailyEntryTab(),
+                    _HistoryTab(),
+                  ]),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -168,15 +176,17 @@ class _DailyEntryTabState extends State<_DailyEntryTab> {
         };
       }).toList();
       await ApiService.bulkAttendance({'date': dateStr, 'attendances': rows});
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('Pointages enregistrés !'),
             backgroundColor: AppTheme.success));
+      }
       await _load();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(e.toString()), backgroundColor: AppTheme.danger));
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -403,8 +413,9 @@ class _HistoryTabState extends State<_HistoryTab> {
   Widget build(BuildContext context) {
     if (_loading) return const LoadingWidget();
     if (_error != null) return ErrorWidget2(message: _error!, onRetry: _load);
-    if (_records.isEmpty)
+    if (_records.isEmpty) {
       return const EmptyWidget(icon: '📅', title: 'Aucun pointage');
+    }
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -470,7 +481,8 @@ class _TimeChip extends StatelessWidget {
   final String? time;
   final Color color;
 
-  const _TimeChip({required this.label, required this.time, required this.color});
+  const _TimeChip(
+      {required this.label, required this.time, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -568,14 +580,15 @@ class _MyAttendanceTabState extends State<_MyAttendanceTab> {
           final cfg = _statuses[s] ??
               {'label': s, 'icon': '•', 'color': AppTheme.textMuted};
           final color = cfg['color'] as Color;
-          final checkinTime  = r['checked_in_at']  as String?;
+          final checkinTime = r['checked_in_at'] as String?;
           final checkoutTime = r['checked_out_at'] as String?;
           final hasTime = checkinTime != null || checkoutTime != null;
           return Card(
             margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+              child:
+                  Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
                 Text(cfg['icon'] as String,
                     style: const TextStyle(fontSize: 22)),
                 const SizedBox(width: 12),
@@ -619,13 +632,11 @@ class _MyAttendanceTabState extends State<_MyAttendanceTab> {
                             color: AppTheme.success,
                           ),
                           if (checkinTime != null && checkoutTime != null)
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 6),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 6),
                               child: Text('→',
                                   style: TextStyle(
-                                      color: AppTheme.textMuted,
-                                      fontSize: 12)),
+                                      color: AppTheme.textMuted, fontSize: 12)),
                             ),
                           _TimeChip(
                             label: 'Départ',

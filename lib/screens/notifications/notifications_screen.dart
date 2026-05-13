@@ -5,6 +5,7 @@ import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_drawer.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/announcement_banner.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -152,13 +153,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
         ],
       ),
-      body: _loading ? const LoadingWidget()
-        : _error != null ? ErrorWidget2(message: _error!, onRetry: _load)
-        : _notifs.isEmpty
-          ? const EmptyWidget(icon: '🔔', title: 'Aucune notification')
-          : RefreshIndicator(
-              onRefresh: _load,
-              child: ListView.builder(
+      body: Column(
+        children: [
+          const AnnouncementBanner(),
+          Expanded(
+            child: _loading ? const LoadingWidget()
+              : _error != null ? ErrorWidget2(message: _error!, onRetry: _load)
+              : _notifs.isEmpty
+                ? const EmptyWidget(icon: '🔔', title: 'Aucune notification')
+                : RefreshIndicator(
+                    onRefresh: _load,
+                    child: ListView.builder(
                 itemCount: _notifs.length,
                 itemBuilder: (ctx, i) {
                   final n      = _notifs[i] as Map<String, dynamic>;
@@ -223,6 +228,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 },
               ),
             ),
+          ),
+        ],
+      ),
     );
   }
 

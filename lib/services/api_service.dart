@@ -8,7 +8,22 @@ import '../config/app_config.dart';
 class ApiException implements Exception {
   final String message;
   final int? statusCode;
-  ApiException(this.message, {this.statusCode});
+  /// Erreurs de validation Laravel : { "field": ["msg1", "msg2"] }
+  final Map<String, List<String>> errors;
+
+  ApiException(this.message, {this.statusCode, Map<String, List<String>>? errors})
+      : errors = errors ?? {};
+
+  /// Retourne la première erreur du champ donné, ou null.
+  String? fieldError(String field) => errors[field]?.firstOrNull;
+
+  /// Toutes les erreurs en une seule chaîne lisible.
+  String get fullMessage {
+    if (errors.isEmpty) return message;
+    final lines = errors.values.expand((e) => e).toList();
+    return lines.join('\n');
+  }
+
   @override
   String toString() => message;
 }
@@ -88,14 +103,26 @@ class ApiService {
 
     final json = jsonDecode(utf8.decode(response.bodyBytes));
     if (response.statusCode >= 200 && response.statusCode < 300) return json;
+
     final msg = (json is Map && json['message'] != null)
         ? json['message'] as String
         : 'Erreur ${response.statusCode}';
+
+    // Extraire les erreurs de validation Laravel (status 422)
+    Map<String, List<String>> errors = {};
+    if (json is Map && json['errors'] is Map) {
+      (json['errors'] as Map).forEach((key, value) {
+        if (value is List) {
+          errors[key as String] = value.map((e) => e.toString()).toList();
+        }
+      });
+    }
+
     if (response.statusCode == 401) {
       await clearToken();
       onUnauthorized?.call();
     }
-    throw ApiException(msg, statusCode: response.statusCode);
+    throw ApiException(msg, statusCode: response.statusCode, errors: errors);
   }
 
   // ── Upload multipart ─────────────────────────────────────────────────────────
@@ -137,6 +164,19 @@ class ApiService {
   static Future<Map<String, dynamic>> checkSetup() async =>
       await request('GET', '/setup/status', auth: false)
           as Map<String, dynamic>;
+
+  static Future<Map<String, dynamic>> setupDG({
+    required String name,
+    required String email,
+    required String password,
+    required String passwordConfirmation,
+  }) async =>
+      await request('POST', '/setup/dg', body: {
+        'name':                  name,
+        'email':                 email,
+        'password':              password,
+        'password_confirmation': passwordConfirmation,
+      }, auth: false) as Map<String, dynamic>;
 
   static Future<Map<String, dynamic>> login(
           String email, String password) async =>
@@ -328,12 +368,14 @@ class ApiService {
       }) as Map<String, dynamic>;
 
   static Future<Map<String, dynamic>> scanMatricule(
-          String matricule, String payload, String signature) async =>
+          String matricule, String payload, String signature,
+          {String? deviceId}) async =>
       await request('POST', '/attendance/scan-matricule',
           body: {
             'matricule': matricule,
             'payload': payload,
             'signature': signature,
+            if (deviceId != null) 'phone_device_id': deviceId,
           },
           auth: false) as Map<String, dynamic>;
 

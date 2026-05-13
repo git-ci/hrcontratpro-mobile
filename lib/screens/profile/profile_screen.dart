@@ -7,7 +7,7 @@ import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common_widgets.dart';
-
+import '../../widgets/announcement_banner.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -268,9 +268,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           },
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(children: [
+      body: Column(
+        children: [
+          const AnnouncementBanner(),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(children: [
           // ── Avatar ────────────────────────────────────────────────────────
           Container(
             padding: const EdgeInsets.all(24),
@@ -434,6 +438,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 24),
         ]),
+            ),
+          ),
+        ],
       ),
     );
   }
