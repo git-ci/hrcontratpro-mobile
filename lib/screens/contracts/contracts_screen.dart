@@ -117,18 +117,19 @@ class _ContractsScreenState extends State<ContractsScreen>
                 : _error != null
                     ? ErrorWidget2(message: _error!, onRetry: _load)
                     : _contracts.isEmpty
-                        ? const EmptyWidget(icon: '📄', title: 'Aucun contrat trouvé')
+                        ? const EmptyWidget(
+                            icon: '📄', title: 'Aucun contrat trouvé')
                         : RefreshIndicator(
                             onRefresh: () => _load(status: _filterStatus),
                             child: ListView.builder(
                               itemCount: _contracts.length,
-                        itemBuilder: (_, i) => _ContractCard(
-                          contract: _contracts[i] as Map<String, dynamic>,
-                          onTap: () => _showDetail(
-                              _contracts[i] as Map<String, dynamic>),
-                        ),
-                      ),
-                    ),
+                              itemBuilder: (_, i) => _ContractCard(
+                                contract: _contracts[i] as Map<String, dynamic>,
+                                onTap: () => _showDetail(
+                                    _contracts[i] as Map<String, dynamic>),
+                              ),
+                            ),
+                          ),
           ),
         ],
       ),
@@ -174,7 +175,7 @@ class _ContractCard extends StatelessWidget {
     final type = c['type']?.toString().toUpperCase() ?? '—';
     final name = c['user']?['name'] ?? AuthService.user?['name'] ?? '—';
     final salary =
-        c['salary'] != null ? '${c['salary']} ${c['currency'] ?? ''}' : '—';
+        c['salary'] != null ? '${c['salary']} F CFA' : '—';
     final start = _fmtDate(c['start_date']);
     final end = c['end_date'] != null ? _fmtDate(c['end_date']) : 'CDI';
 
@@ -380,7 +381,7 @@ class _ContractDetailState extends State<_ContractDetail> {
           InfoRow(
               icon: Icons.euro,
               label: 'Salaire',
-              value: '${c['salary'] ?? '—'} ${c['currency'] ?? ''}'),
+              value: '${c['salary'] ?? '—'} F CFA'),
           InfoRow(
               icon: Icons.date_range,
               label: 'Début',
@@ -484,7 +485,7 @@ class _CreateContractFormState extends State<_CreateContractForm> {
   int? _selectedEmp;
   String _type = 'CDI';
   final _salary = TextEditingController();
-  final _currency = TextEditingController(text: 'XOF');
+  final _currency = TextEditingController(text: 'F CFA');
   DateTime? _start;
   DateTime? _end;
   final _notes = TextEditingController();
@@ -831,7 +832,7 @@ class _EditContractFormState extends State<_EditContractForm> {
     super.initState();
     final c = widget.contract;
     _salary = TextEditingController(text: c['salary']?.toString() ?? '');
-    _currency = TextEditingController(text: c['currency'] ?? 'XOF');
+    _currency = TextEditingController(text: c['currency'] ?? 'F CFA');
     _notes = TextEditingController(text: c['notes'] ?? '');
     _type = c['type'] ?? 'cdi';
     if (c['end_date'] != null) {

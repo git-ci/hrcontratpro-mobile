@@ -397,11 +397,18 @@ class ApiService {
       await request('POST', '/my-leave-plan', body: data)
           as Map<String, dynamic>;
 
+  static Future<void> deleteMyLeavePlan(int id) async =>
+      await request('DELETE', '/my-leave-plan/$id');
+
   static Future<void> approveLeavePlan(int id) async =>
       await request('POST', '/leave-plans/$id/approve');
 
   static Future<void> rejectLeavePlan(int id, String reason) async =>
       await request('POST', '/leave-plans/$id/reject',
+          body: {'reason': reason});
+
+  static Future<void> requestChangeLeavePlan(int id, String reason) async =>
+      await request('POST', '/leave-plans/$id/request-change',
           body: {'reason': reason});
 
   // ── Demandes de contrat ───────────────────────────────────────────────────────
@@ -484,8 +491,12 @@ class ApiService {
 
   // ── Annonces ─────────────────────────────────────────────────────────────────
 
-  static Future<List<dynamic>> getAnnouncements() async =>
-      await request('GET', '/announcements') as List<dynamic>;
+  static Future<List<dynamic>> getAnnouncements() async {
+    final res = await request('GET', '/announcements');
+    if (res is List) return res;
+    if (res is Map && res['data'] is List) return res['data'] as List;
+    return [];
+  }
 
   static Future<Map<String, dynamic>> createAnnouncement(Map<String, dynamic> data) async =>
       await request('POST', '/announcements', body: data) as Map<String, dynamic>;

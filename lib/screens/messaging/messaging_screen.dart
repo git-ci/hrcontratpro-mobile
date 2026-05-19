@@ -30,24 +30,29 @@ class _MessagingScreenState extends State<MessagingScreen> {
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         ApiService.getConversations(),
         ApiService.getAnnouncements(),
       ]);
       setState(() {
-        _conversations = results[0] as List<dynamic>;
-        _announcements = results[1] as List<dynamic>;
+        _conversations = results[0];
+        _announcements = results[1];
         _loading = false;
       });
     } catch (e) {
-      setState(() { _error = e.toString(); _loading = false; });
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
     }
   }
 
-  bool get _canAnnounce =>
-      AuthService.role == 'rh' || AuthService.role == 'dg';
+  bool get _canAnnounce => AuthService.role == 'rh' || AuthService.role == 'dg';
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +90,8 @@ class _MessagingScreenState extends State<MessagingScreen> {
                               canEdit: _canAnnounce &&
                                   a['sender']?['id'] == AuthService.user?['id'],
                               onDelete: () async {
-                                await ApiService.deleteAnnouncement(a['id'] as int);
+                                await ApiService.deleteAnnouncement(
+                                    a['id'] as int);
                                 _load();
                               },
                               onEdit: (updated) {
@@ -112,8 +118,12 @@ class _MessagingScreenState extends State<MessagingScreen> {
                       else
                         ..._conversations.map((c) => _ConversationTile(
                               conv: c,
-                              onTap: () => context.push('$_rolePrefix/messaging/chat/${c['partner_id']}',
-                                  extra: c['partner_name']),
+                              onTap: () => context
+                                  .push(
+                                    '$_rolePrefix/messaging/chat/${c['partner_id']}',
+                                    extra: c['partner_name'],
+                                  )
+                                  .then((_) { if (mounted) _load(); }),
                             )),
                     ],
                   ),
@@ -134,8 +144,11 @@ class _MessagingScreenState extends State<MessagingScreen> {
         initialChildSize: 0.6,
         builder: (_, ctrl) => Column(children: [
           const SizedBox(height: 8),
-          Container(width: 36, height: 4,
-              decoration: BoxDecoration(color: AppTheme.border,
+          Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: AppTheme.border,
                   borderRadius: BorderRadius.circular(2))),
           const Padding(
             padding: EdgeInsets.all(16),
@@ -153,14 +166,20 @@ class _MessagingScreenState extends State<MessagingScreen> {
                     backgroundColor: AppTheme.accent.withOpacity(0.15),
                     child: Text((u['name'] as String? ?? '?')[0].toUpperCase(),
                         style: const TextStyle(
-                            color: AppTheme.accent, fontWeight: FontWeight.w700)),
+                            color: AppTheme.accent,
+                            fontWeight: FontWeight.w700)),
                   ),
                   title: Text(u['name'] ?? ''),
                   subtitle: Text(_roleLabel(u['role']),
                       style: const TextStyle(fontSize: 11)),
                   onTap: () {
                     Navigator.pop(context);
-                    context.push('$_rolePrefix/messaging/chat/${u['id']}', extra: u['name']);
+                    context
+                        .push(
+                          '$_rolePrefix/messaging/chat/${u['id']}',
+                          extra: u['name'],
+                        )
+                        .then((_) { if (mounted) _load(); });
                   },
                 );
               },
@@ -182,11 +201,11 @@ class _MessagingScreenState extends State<MessagingScreen> {
   }
 
   String _roleLabel(String? r) => switch (r) {
-    'dg'       => 'Directeur Général',
-    'rh'       => 'Ressources Humaines',
-    'employee' => 'Employé',
-    _          => r ?? '',
-  };
+        'dg' => 'Directeur Général',
+        'rh' => 'Ressources Humaines',
+        'employee' => 'Employé',
+        _ => r ?? '',
+      };
 }
 
 // ── Tuile annonce ─────────────────────────────────────────────────────────────
@@ -204,17 +223,21 @@ class _AnnouncementTile extends StatelessWidget {
   });
 
   static const _colors = {
-    'info'    : (Color(0xFF1565C0), Color(0xFFE3F2FD), Icons.info_outline),
-    'warning' : (Color(0xFFE65100), Color(0xFFFFF3E0), Icons.warning_amber_outlined),
+    'info': (Color(0xFF1565C0), Color(0xFFE3F2FD), Icons.info_outline),
+    'warning': (
+      Color(0xFFE65100),
+      Color(0xFFFFF3E0),
+      Icons.warning_amber_outlined
+    ),
     'sanction': (Color(0xFFC62828), Color(0xFFFFEBEE), Icons.gavel_outlined),
   };
 
   @override
   Widget build(BuildContext context) {
     final type = ann['type'] as String? ?? 'info';
-    final cfg  = _colors[type] ?? _colors['info']!;
-    final fg   = cfg.$1;
-    final bg   = cfg.$2;
+    final cfg = _colors[type] ?? _colors['info']!;
+    final fg = cfg.$1;
+    final bg = cfg.$2;
     final icon = cfg.$3;
 
     return Container(
@@ -227,8 +250,10 @@ class _AnnouncementTile extends StatelessWidget {
       child: ListTile(
         leading: Icon(icon, color: fg),
         title: Text(ann['title'] ?? '',
-            style: TextStyle(fontWeight: FontWeight.w700, color: fg, fontSize: 14)),
-        subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            style: TextStyle(
+                fontWeight: FontWeight.w700, color: fg, fontSize: 14)),
+        subtitle:
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(ann['body'] ?? '',
               style: TextStyle(fontSize: 12, color: fg.withOpacity(0.8))),
           const SizedBox(height: 2),
@@ -239,15 +264,18 @@ class _AnnouncementTile extends StatelessWidget {
         ]),
         trailing: canEdit
             ? PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert, size: 18, color: fg.withOpacity(0.6)),
+                icon:
+                    Icon(Icons.more_vert, size: 18, color: fg.withOpacity(0.6)),
                 onSelected: (value) {
-                  if (value == 'edit')   _showEditSheet(context, fg);
+                  if (value == 'edit') _showEditSheet(context, fg);
                   if (value == 'delete') onDelete();
                 },
                 itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'edit',   child: Text('Modifier')),
-                  PopupMenuItem(value: 'delete', child: Text('Supprimer',
-                      style: TextStyle(color: Colors.red))),
+                  PopupMenuItem(value: 'edit', child: Text('Modifier')),
+                  PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Supprimer',
+                          style: TextStyle(color: Colors.red))),
                 ],
               )
             : null,
@@ -256,9 +284,10 @@ class _AnnouncementTile extends StatelessWidget {
   }
 
   void _showEditSheet(BuildContext context, Color fg) {
-    final titleCtrl = TextEditingController(text: ann['title'] as String? ?? '');
-    final bodyCtrl  = TextEditingController(text: ann['body']  as String? ?? '');
-    String type     = ann['type'] as String? ?? 'info';
+    final titleCtrl =
+        TextEditingController(text: ann['title'] as String? ?? '');
+    final bodyCtrl = TextEditingController(text: ann['body'] as String? ?? '');
+    String type = ann['type'] as String? ?? 'info';
 
     showModalBottomSheet(
       context: context,
@@ -268,74 +297,92 @@ class _AnnouncementTile extends StatelessWidget {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => Padding(
           padding: EdgeInsets.only(
-              left: 20, right: 20, top: 16,
+              left: 20,
+              right: 20,
+              top: 16,
               bottom: MediaQuery.of(ctx).viewInsets.bottom + 24),
-          child: Column(mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Center(child: Container(width: 36, height: 4,
-                decoration: BoxDecoration(color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2)))),
-            const SizedBox(height: 16),
-            const Text('Modifier l\'annonce',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 16),
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                    child: Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2)))),
+                const SizedBox(height: 16),
+                const Text('Modifier l\'annonce',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 16),
 
-            // Type chips
-            Row(children: [
-              for (final t in ['info', 'warning', 'sanction'])
-                Expanded(child: Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: _TypeChip(
-                    label: t == 'info' ? 'Info' : t == 'warning' ? 'Alerte' : 'Sanction',
-                    color: t == 'info' ? const Color(0xFF1565C0)
-                        : t == 'warning' ? const Color(0xFFE65100)
-                        : const Color(0xFFC62828),
-                    selected: type == t,
-                    onTap: () => setLocal(() => type = t),
+                // Type chips
+                Row(children: [
+                  for (final t in ['info', 'warning', 'sanction'])
+                    Expanded(
+                        child: Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: _TypeChip(
+                        label: t == 'info'
+                            ? 'Info'
+                            : t == 'warning'
+                                ? 'Alerte'
+                                : 'Sanction',
+                        color: t == 'info'
+                            ? const Color(0xFF1565C0)
+                            : t == 'warning'
+                                ? const Color(0xFFE65100)
+                                : const Color(0xFFC62828),
+                        selected: type == t,
+                        onTap: () => setLocal(() => type = t),
+                      ),
+                    )),
+                ]),
+                const SizedBox(height: 12),
+
+                TextField(
+                  controller: titleCtrl,
+                  decoration: const InputDecoration(
+                      labelText: 'Titre',
+                      border: OutlineInputBorder(),
+                      isDense: true),
+                ),
+                const SizedBox(height: 12),
+
+                TextField(
+                  controller: bodyCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                      labelText: 'Message', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 16),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () async {
+                      final title = titleCtrl.text.trim();
+                      final body = bodyCtrl.text.trim();
+                      if (title.isEmpty || body.isEmpty) return;
+                      Navigator.pop(ctx);
+                      try {
+                        final updated = await ApiService.editAnnouncement(
+                            ann['id'] as int,
+                            {'type': type, 'title': title, 'body': body});
+                        onEdit(updated);
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Erreur : $e')));
+                        }
+                      }
+                    },
+                    child: const Text('Enregistrer'),
                   ),
-                )),
-            ]),
-            const SizedBox(height: 12),
-
-            TextField(
-              controller: titleCtrl,
-              decoration: const InputDecoration(
-                  labelText: 'Titre', border: OutlineInputBorder(), isDense: true),
-            ),
-            const SizedBox(height: 12),
-
-            TextField(
-              controller: bodyCtrl,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                  labelText: 'Message', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 16),
-
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () async {
-                  final title = titleCtrl.text.trim();
-                  final body  = bodyCtrl.text.trim();
-                  if (title.isEmpty || body.isEmpty) return;
-                  Navigator.pop(ctx);
-                  try {
-                    final updated = await ApiService.editAnnouncement(
-                        ann['id'] as int,
-                        {'type': type, 'title': title, 'body': body});
-                    onEdit(updated);
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Erreur : $e')));
-                    }
-                  }
-                },
-                child: const Text('Enregistrer'),
-              ),
-            ),
-          ]),
+                ),
+              ]),
         ),
       ),
     );
@@ -344,13 +391,15 @@ class _AnnouncementTile extends StatelessWidget {
   String _fmtDate(String? d) {
     if (d == null) return '';
     try {
-      final dt   = DateTime.parse(d).toLocal();
-      final now  = DateTime.now();
+      final dt = DateTime.parse(d).toLocal();
+      final now = DateTime.now();
       final diff = now.difference(dt);
       if (diff.inMinutes < 60) return '${diff.inMinutes}min';
-      if (diff.inHours < 24)   return '${diff.inHours}h';
+      if (diff.inHours < 24) return '${diff.inHours}h';
       return '${dt.day}/${dt.month}/${dt.year}';
-    } catch (_) { return ''; }
+    } catch (_) {
+      return '';
+    }
   }
 }
 
@@ -363,10 +412,10 @@ class _ConversationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name    = conv['partner_name'] as String? ?? '?';
-    final body    = conv['body'] as String? ?? '';
-    final unread  = (conv['unread_count'] as num?)?.toInt() ?? 0;
-    final isMe    = conv['sender_id'] == AuthService.user?['id'];
+    final name = conv['partner_name'] as String? ?? '?';
+    final body = conv['body'] as String? ?? '';
+    final unread = (conv['unread_count'] as num?)?.toInt() ?? 0;
+    final isMe = conv['sender_id'] == AuthService.user?['id'];
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -396,7 +445,9 @@ class _ConversationTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12)),
               child: Text('$unread',
                   style: const TextStyle(
-                      color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700)),
             )
           : null,
       onTap: onTap,
@@ -415,8 +466,8 @@ class _AnnounceFormSheet extends StatefulWidget {
 
 class _AnnounceFormSheetState extends State<_AnnounceFormSheet> {
   final _titleCtrl = TextEditingController();
-  final _bodyCtrl  = TextEditingController();
-  String _type     = 'info';
+  final _bodyCtrl = TextEditingController();
+  String _type = 'info';
   int? _targetId;
   List<dynamic> _users = [];
   bool _sending = false;
@@ -441,9 +492,9 @@ class _AnnounceFormSheetState extends State<_AnnounceFormSheet> {
     setState(() => _sending = true);
     try {
       await ApiService.createAnnouncement({
-        'type'           : _type,
-        'title'          : _titleCtrl.text.trim(),
-        'body'           : _bodyCtrl.text.trim(),
+        'type': _type,
+        'title': _titleCtrl.text.trim(),
+        'body': _bodyCtrl.text.trim(),
         if (_targetId != null) 'target_user_id': _targetId,
       });
       if (mounted) {
@@ -459,78 +510,101 @@ class _AnnounceFormSheetState extends State<_AnnounceFormSheet> {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(
-          left: 20, right: 20, top: 16,
+          left: 20,
+          right: 20,
+          top: 16,
           bottom: MediaQuery.of(context).viewInsets.bottom + 24),
-      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Center(child: Container(width: 36, height: 4,
-            decoration: BoxDecoration(color: AppTheme.border,
-                borderRadius: BorderRadius.circular(2)))),
-        const SizedBox(height: 16),
-        const Text('Nouvelle annonce',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 16),
+      child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+                child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: AppTheme.border,
+                        borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 16),
+            const Text('Nouvelle annonce',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
 
-        // Type
-        Row(children: [
-          for (final t in ['info', 'warning', 'sanction'])
-            Expanded(child: Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: _TypeChip(
-                label: t == 'info' ? 'Info' : t == 'warning' ? 'Alerte' : 'Sanction',
-                color: t == 'info' ? const Color(0xFF1565C0)
-                    : t == 'warning' ? const Color(0xFFE65100)
-                    : const Color(0xFFC62828),
-                selected: _type == t,
-                onTap: () => setState(() => _type = t),
+            // Type
+            Row(children: [
+              for (final t in ['info', 'warning', 'sanction'])
+                Expanded(
+                    child: Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: _TypeChip(
+                    label: t == 'info'
+                        ? 'Info'
+                        : t == 'warning'
+                            ? 'Alerte'
+                            : 'Sanction',
+                    color: t == 'info'
+                        ? const Color(0xFF1565C0)
+                        : t == 'warning'
+                            ? const Color(0xFFE65100)
+                            : const Color(0xFFC62828),
+                    selected: _type == t,
+                    onTap: () => setState(() => _type = t),
+                  ),
+                )),
+            ]),
+            const SizedBox(height: 12),
+
+            // Destinataire
+            DropdownButtonFormField<int?>(
+              value: _targetId,
+              decoration: const InputDecoration(
+                  labelText: 'Destinataire',
+                  hintText: 'Tout le monde (broadcast)',
+                  border: OutlineInputBorder(),
+                  isDense: true),
+              items: [
+                const DropdownMenuItem(
+                    value: null, child: Text('Tout le monde')),
+                ..._users.map((u) => DropdownMenuItem(
+                    value: u['id'] as int, child: Text(u['name'] ?? ''))),
+              ],
+              onChanged: (v) => setState(() => _targetId = v),
+            ),
+            const SizedBox(height: 12),
+
+            // Titre
+            TextField(
+              controller: _titleCtrl,
+              decoration: const InputDecoration(
+                  labelText: 'Titre',
+                  border: OutlineInputBorder(),
+                  isDense: true),
+            ),
+            const SizedBox(height: 12),
+
+            // Corps
+            TextField(
+              controller: _bodyCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                  labelText: 'Message', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 16),
+
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _sending ? null : _send,
+                child: _sending
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Text('Envoyer'),
               ),
-            )),
-        ]),
-        const SizedBox(height: 12),
-
-        // Destinataire
-        DropdownButtonFormField<int?>(
-          value: _targetId,
-          decoration: const InputDecoration(
-              labelText: 'Destinataire', hintText: 'Tout le monde (broadcast)',
-              border: OutlineInputBorder(), isDense: true),
-          items: [
-            const DropdownMenuItem(value: null, child: Text('Tout le monde')),
-            ..._users.map((u) => DropdownMenuItem(
-                value: u['id'] as int,
-                child: Text(u['name'] ?? ''))),
-          ],
-          onChanged: (v) => setState(() => _targetId = v),
-        ),
-        const SizedBox(height: 12),
-
-        // Titre
-        TextField(
-          controller: _titleCtrl,
-          decoration: const InputDecoration(
-              labelText: 'Titre', border: OutlineInputBorder(), isDense: true),
-        ),
-        const SizedBox(height: 12),
-
-        // Corps
-        TextField(
-          controller: _bodyCtrl,
-          maxLines: 3,
-          decoration: const InputDecoration(
-              labelText: 'Message', border: OutlineInputBorder()),
-        ),
-        const SizedBox(height: 16),
-
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: _sending ? null : _send,
-            child: _sending
-                ? const SizedBox(width: 18, height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Envoyer'),
-          ),
-        ),
-      ]),
+            ),
+          ]),
     );
   }
 }
@@ -540,24 +614,29 @@ class _TypeChip extends StatelessWidget {
   final Color color;
   final bool selected;
   final VoidCallback onTap;
-  const _TypeChip({required this.label, required this.color,
-      required this.selected, required this.onTap});
+  const _TypeChip(
+      {required this.label,
+      required this.color,
+      required this.selected,
+      required this.onTap});
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        color: selected ? color : color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.4)),
-      ),
-      child: Center(child: Text(label,
-          style: TextStyle(
-              fontSize: 12, fontWeight: FontWeight.w700,
-              color: selected ? Colors.white : color))),
-    ),
-  );
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? color : color.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: color.withOpacity(0.4)),
+          ),
+          child: Center(
+              child: Text(label,
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: selected ? Colors.white : color))),
+        ),
+      );
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -565,10 +644,12 @@ class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.label});
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-    child: Text(label,
-        style: const TextStyle(
-            fontSize: 10, fontWeight: FontWeight.w700,
-            color: AppTheme.textMuted, letterSpacing: 0.8)),
-  );
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+        child: Text(label,
+            style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textMuted,
+                letterSpacing: 0.8)),
+      );
 }

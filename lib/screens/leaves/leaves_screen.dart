@@ -143,14 +143,54 @@ class _MyLeavePlanScreenState extends State<_MyLeavePlanScreen> {
   }
 
   void _showPlanDetail(Map<String, dynamic> plan) {
+    final status = plan['status'] ?? '';
+    final canDelete = status != 'approved';
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => _LeavePlanDetail(plan: plan),
+      builder: (_) => _LeavePlanDetail(
+        plan: plan,
+        onDelete: canDelete ? () => _deletePlan(plan) : null,
+      ),
     );
+  }
+
+  Future<void> _deletePlan(Map<String, dynamic> plan) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Supprimer le planning'),
+        content: const Text('Voulez-vous vraiment supprimer ce planning de congé ?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogCtx, false),
+              child: const Text('Annuler')),
+          ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
+              onPressed: () => Navigator.pop(dialogCtx, true),
+              child: const Text('Supprimer')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ApiService.deleteMyLeavePlan(plan['id']);
+      if (mounted) {
+        Navigator.pop(context); // ferme le bottom sheet de détail
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Planning supprimé.'),
+            backgroundColor: AppTheme.danger));
+        _load();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(e.toString()), backgroundColor: AppTheme.danger));
+      }
+    }
   }
 
   void _showAddPeriodForm() {
@@ -161,6 +201,204 @@ class _MyLeavePlanScreenState extends State<_MyLeavePlanScreen> {
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => _AddLeaveForm(onSubmitted: _load),
+    );
+  }
+}
+
+// ── Feuille planning personnel (DG / RH) ─────────────────────────────────────
+class _MyLeavePlanSheet extends StatefulWidget {
+  const _MyLeavePlanSheet();
+  @override
+  State<_MyLeavePlanSheet> createState() => _MyLeavePlanSheetState();
+}
+
+class _MyLeavePlanSheetState extends State<_MyLeavePlanSheet> {
+  Map<String, dynamic>? _planData;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final data = await ApiService.getMyLeavePlan();
+      setState(() {
+        _planData = data as Map<String, dynamic>?;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  void _showAddForm() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => _AddLeaveForm(onSubmitted: _load),
+    );
+  }
+
+  void _showPlanDetail(Map<String, dynamic> plan) {
+    final status = plan['status'] ?? '';
+    final canDelete = status != 'approved';
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => _LeavePlanDetail(
+        plan: plan,
+        onDelete: canDelete ? () => _deletePlan(plan) : null,
+      ),
+    );
+  }
+
+  Future<void> _deletePlan(Map<String, dynamic> plan) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Supprimer le planning'),
+        content:
+            const Text('Voulez-vous vraiment supprimer ce planning de congé ?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogCtx, false),
+              child: const Text('Annuler')),
+          ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
+              onPressed: () => Navigator.pop(dialogCtx, true),
+              child: const Text('Supprimer')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ApiService.deleteMyLeavePlan(plan['id']);
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Planning supprimé.'),
+            backgroundColor: AppTheme.danger));
+        _load();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(e.toString()), backgroundColor: AppTheme.danger));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (_, ctrl) => Column(children: [
+        // Poignée + en-tête
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 16, 0),
+          child: Column(children: [
+            Center(
+                child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: AppTheme.border,
+                        borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 14),
+            Row(children: [
+              const Icon(Icons.beach_access_outlined,
+                  size: 18, color: AppTheme.primary),
+              const SizedBox(width: 8),
+              const Expanded(
+                  child: Text('Mon planning de congé',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w700))),
+              IconButton(
+                icon: const Icon(Icons.add_circle_outline,
+                    color: AppTheme.primary),
+                tooltip: 'Nouveau planning',
+                onPressed: _showAddForm,
+              ),
+            ]),
+            const Divider(height: 16),
+          ]),
+        ),
+        // Contenu
+        Expanded(
+          child: _loading
+              ? const LoadingWidget()
+              : _error != null
+                  ? ErrorWidget2(message: _error!, onRetry: _load)
+                  : _buildContent(ctrl),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildContent(ScrollController ctrl) {
+    final d = _planData ?? {};
+    final remaining = d['remaining_days'] ?? 30;
+    final plans = (d['plans'] ?? []) as List;
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(controller: ctrl, children: [
+        // KPIs
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(children: [
+            Expanded(
+                child: StatCard(
+                    icon: '📅',
+                    value: '$remaining',
+                    label: 'Jours restants',
+                    color: AppTheme.primary)),
+            const SizedBox(width: 10),
+            Expanded(
+                child: StatCard(
+                    icon: '✅',
+                    value: '${d['approved_days'] ?? 0}',
+                    label: 'Jours approuvés',
+                    color: AppTheme.success)),
+          ]),
+        ),
+        const SizedBox(height: 12),
+        // Liste des plannings
+        if (plans.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: EmptyWidget(
+                icon: '🏖️',
+                title: 'Aucun planning soumis',
+                subtitle: 'Appuyez sur + pour créer un planning'),
+          )
+        else
+          ...plans.map((p) => _LeavePlanCard(
+                plan: p as Map<String, dynamic>,
+                onTap: () => _showPlanDetail(p),
+              )),
+        const SizedBox(height: 40),
+      ]),
     );
   }
 }
@@ -255,7 +493,7 @@ class _ManageLeavesScreenState extends State<_ManageLeavesScreen>
     final ctrl = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         title: const Text('Rejeter le planning'),
         content: TextField(
             controller: ctrl,
@@ -263,11 +501,11 @@ class _ManageLeavesScreenState extends State<_ManageLeavesScreen>
             maxLines: 3),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(dialogCtx, false),
               child: const Text('Annuler')),
           ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () => Navigator.pop(dialogCtx, true),
               child: const Text('Rejeter')),
         ],
       ),
@@ -289,12 +527,70 @@ class _ManageLeavesScreenState extends State<_ManageLeavesScreen>
     }
   }
 
+  Future<void> _requestChange(int id) async {
+    final ctrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Demander une modification'),
+        content: TextField(
+            controller: ctrl,
+            decoration: const InputDecoration(
+                labelText: 'Motif / instructions de modification'),
+            maxLines: 3),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogCtx, false),
+              child: const Text('Annuler')),
+          ElevatedButton(
+              style:
+                  ElevatedButton.styleFrom(backgroundColor: AppTheme.warning),
+              onPressed: () => Navigator.pop(dialogCtx, true),
+              child: const Text('Envoyer')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ApiService.requestChangeLeavePlan(id, ctrl.text);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Modification demandée.'),
+            backgroundColor: AppTheme.warning));
+      }
+      await _load(status: _filter);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(e.toString()), backgroundColor: AppTheme.danger));
+      }
+    }
+  }
+
+  void _showMyPlan() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => const _MyLeavePlanSheet(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         leading: const DrawerMenuButton(),
         title: const Text('Congés'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.beach_access_outlined),
+            tooltip: 'Mon planning',
+            onPressed: _showMyPlan,
+          ),
+        ],
         bottom: TabBar(
           controller: _tabs,
           isScrollable: true,
@@ -334,7 +630,13 @@ class _ManageLeavesScreenState extends State<_ManageLeavesScreen>
                         itemBuilder: (_, i) {
                           final p = _plans[i] as Map<String, dynamic>;
                           final status = p['status'] ?? 'pending';
-                          final canAct =
+                          // Le DG peut agir sur les plannings en attente ou
+                          // renvoyés pour modification (change_requested)
+                          final canAct = AuthService.isDG &&
+                              (status == 'pending' ||
+                                  status == 'change_requested');
+                          // Demander modification : uniquement sur pending
+                          final canRequestChange =
                               AuthService.isDG && status == 'pending';
 
                           return _LeavePlanCard(
@@ -359,6 +661,12 @@ class _ManageLeavesScreenState extends State<_ManageLeavesScreen>
                                     ? () {
                                         Navigator.pop(context);
                                         _reject(p['id']);
+                                      }
+                                    : null,
+                                onRequestChange: canRequestChange
+                                    ? () {
+                                        Navigator.pop(context);
+                                        _requestChange(p['id']);
                                       }
                                     : null,
                               ),
@@ -432,7 +740,14 @@ class _LeavePlanDetail extends StatelessWidget {
   final Map<String, dynamic> plan;
   final VoidCallback? onApprove;
   final VoidCallback? onReject;
-  const _LeavePlanDetail({required this.plan, this.onApprove, this.onReject});
+  final VoidCallback? onRequestChange;
+  final VoidCallback? onDelete;
+  const _LeavePlanDetail(
+      {required this.plan,
+      this.onApprove,
+      this.onReject,
+      this.onRequestChange,
+      this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -519,7 +834,7 @@ class _LeavePlanDetail extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                           Text(
-                              '${_fmtDate(per['start_date'])} → ${_fmtDate(per['end_date'])}',
+                              '${_fmtDate(per['start'])} → ${_fmtDate(per['end'])}',
                               style: const TextStyle(
                                   fontWeight: FontWeight.w600, fontSize: 13)),
                           Text('${per['days'] ?? 0} jours · ${pCfg['label']}',
@@ -553,8 +868,9 @@ class _LeavePlanDetail extends StatelessWidget {
                 ),
               ],
             ]))),
-        if (onApprove != null || onReject != null) ...[
+        if (onApprove != null || onReject != null || onRequestChange != null) ...[
           const Divider(),
+          // Ligne 1 : Refuser + Approuver
           Row(children: [
             if (onReject != null)
               Expanded(
@@ -578,6 +894,35 @@ class _LeavePlanDetail extends StatelessWidget {
                     ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
               )),
           ]),
+          // Ligne 2 : Demander modification
+          if (onRequestChange != null) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onRequestChange,
+                icon: const Icon(Icons.edit_note_outlined),
+                label: const Text('Demander une modification'),
+                style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.warning,
+                    side: const BorderSide(color: AppTheme.warning)),
+              ),
+            ),
+          ],
+        ],
+        if (onDelete != null) ...[
+          const Divider(),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Supprimer ce planning'),
+              style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.danger,
+                  side: const BorderSide(color: AppTheme.danger)),
+            ),
+          ),
         ],
         const SizedBox(height: 8),
       ]),
@@ -656,9 +1001,9 @@ class _AddLeaveFormState extends State<_AddLeaveForm> {
                     onPressed: start != null && end != null
                         ? () {
                             setState(() => _periods.add({
-                                  'start_date':
+                                  'start':
                                       start!.toIso8601String().substring(0, 10),
-                                  'end_date':
+                                  'end':
                                       end!.toIso8601String().substring(0, 10),
                                   'days': end!.difference(start!).inDays + 1,
                                 }));
@@ -672,7 +1017,69 @@ class _AddLeaveFormState extends State<_AddLeaveForm> {
             ));
   }
 
-  Future<void> _submit() async {
+  Future<void> _editPeriod(int index) async {
+    final existing = _periods[index];
+    DateTime? start = DateTime.tryParse(existing['start'] ?? '');
+    DateTime? end = DateTime.tryParse(existing['end'] ?? '');
+    await showDialog(
+        context: context,
+        builder: (_) => StatefulBuilder(
+              builder: (ctx, setInner) => AlertDialog(
+                title: const Text('Modifier la période'),
+                content: Column(mainAxisSize: MainAxisSize.min, children: [
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.date_range, size: 16),
+                    label: Text(start == null
+                        ? 'Date de début'
+                        : '${start!.day}/${start!.month}/${start!.year}'),
+                    onPressed: () async {
+                      final d = await showDatePicker(
+                          context: ctx,
+                          initialDate: start ?? DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2100));
+                      if (d != null) setInner(() => start = d);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.event, size: 16),
+                    label: Text(end == null
+                        ? 'Date de fin'
+                        : '${end!.day}/${end!.month}/${end!.year}'),
+                    onPressed: () async {
+                      final d = await showDatePicker(
+                          context: ctx,
+                          initialDate: end ?? start ?? DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2100));
+                      if (d != null) setInner(() => end = d);
+                    },
+                  ),
+                ]),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Annuler')),
+                  ElevatedButton(
+                    onPressed: start != null && end != null
+                        ? () {
+                            setState(() => _periods[index] = {
+                                  'start': start!.toIso8601String().substring(0, 10),
+                                  'end': end!.toIso8601String().substring(0, 10),
+                                  'days': end!.difference(start!).inDays + 1,
+                                });
+                            Navigator.pop(ctx);
+                          }
+                        : null,
+                    child: const Text('Enregistrer'),
+                  ),
+                ],
+              ),
+            ));
+  }
+
+  Future<void> _submit({required bool submit}) async {
     if (_periods.isEmpty) {
       setState(() => _error = 'Ajoutez au moins une période.');
       return;
@@ -686,12 +1093,13 @@ class _AddLeaveFormState extends State<_AddLeaveForm> {
         'year': _year,
         'reason': _reason.text,
         'periods': _periods,
+        'submit': submit,
       });
       widget.onSubmitted();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Planning soumis !'),
-            backgroundColor: AppTheme.success));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(submit ? 'Planning soumis pour validation !' : 'Brouillon enregistré.'),
+            backgroundColor: submit ? AppTheme.success : AppTheme.primary));
         Navigator.pop(context);
       }
     } catch (e) {
@@ -756,8 +1164,12 @@ class _AddLeaveFormState extends State<_AddLeaveForm> {
               child: Row(children: [
                 Expanded(
                     child: Text(
-                        '${p['start_date']} → ${p['end_date']} (${p['days']} jours)',
+                        '${p['start']} → ${p['end']} (${p['days']} jours)',
                         style: const TextStyle(fontSize: 13))),
+                IconButton(
+                    icon: const Icon(Icons.edit,
+                        size: 16, color: AppTheme.primary),
+                    onPressed: () => _editPeriod(_periods.indexOf(p))),
                 IconButton(
                     icon: const Icon(Icons.delete,
                         size: 16, color: AppTheme.danger),
@@ -779,18 +1191,29 @@ class _AddLeaveFormState extends State<_AddLeaveForm> {
         ],
         const SizedBox(height: 16),
 
-        SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _loading ? null : _submit,
-              child: _loading
+        Row(children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _loading ? null : () => _submit(submit: false),
+              icon: const Icon(Icons.save_outlined, size: 16),
+              label: const Text('Brouillon'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _loading ? null : () => _submit(submit: true),
+              icon: _loading
                   ? const SizedBox(
-                      width: 18,
-                      height: 18,
+                      width: 14,
+                      height: 14,
                       child: CircularProgressIndicator(
                           color: Colors.white, strokeWidth: 2))
-                  : const Text('Soumettre la demande'),
-            )),
+                  : const Icon(Icons.send, size: 16),
+              label: const Text('Soumettre'),
+            ),
+          ),
+        ]),
       ])),
     );
   }

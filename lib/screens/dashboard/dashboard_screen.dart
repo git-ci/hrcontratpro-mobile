@@ -276,12 +276,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Expanded(
                     child: _SalaryKpi(
                         label: 'Masse mensuelle',
-                        value: '${_fmtSalary(sal['total_monthly'])} XOF')),
+                        value: '${_fmtSalary(sal['total_monthly'])} F CFA')),
                 const SizedBox(width: 10),
                 Expanded(
                     child: _SalaryKpi(
                         label: 'Moy. mensuelle',
-                        value: '${_fmtSalary(sal['avg_monthly'])} XOF')),
+                        value: '${_fmtSalary(sal['avg_monthly'])} F CFA')),
               ]),
             );
           }),
@@ -440,6 +440,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final rate = (_myAttStats['presence_rate'] as num?)?.toDouble() ?? 0.0;
     final retardRate = (_myAttStats['retard_rate'] as num?)?.toDouble() ?? 0.0;
 
+    // Comparaison mois précédent
+    final currAbsRate = (_myAttStats['absence_rate'] as num?)?.toDouble() ?? 0.0;
+    final prevAbsRate = (_myAttStats['prev_absence_rate'] as num?)?.toDouble() ?? 0.0;
+    final prevRetardRate = (_myAttStats['prev_retard_rate'] as num?)?.toDouble() ?? 0.0;
+    final prevLabel = (_myAttStats['prev_month_label'] as String?) ?? 'M-1';
+    final currLabel = (_myAttStats['curr_month_label'] as String?) ?? 'M';
+
     // Contrat actif
     final contract = s['active_contract'] as Map<String, dynamic>?;
     final ctType = contract?['type']?.toString().toUpperCase() ?? '—';
@@ -492,6 +499,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 color: AppTheme.warning),
           ]),
         ]),
+      ),
+      const SizedBox(height: 10),
+
+      // Graphique comparaison mois précédent / mois en cours
+      _AttCompareChart(
+        prevLabel: prevLabel,
+        currLabel: currLabel,
+        prevAbsRate: prevAbsRate,
+        currAbsRate: currAbsRate,
+        prevRetardRate: prevRetardRate,
+        currRetardRate: retardRate,
       ),
       const SizedBox(height: 10),
 
@@ -631,7 +649,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     style: const TextStyle(
                         fontSize: 11, color: AppTheme.textMuted)),
               if (ctSalary != null)
-                Text('$ctSalary XOF/mois',
+                Text('$ctSalary F CFA/mois',
                     style: const TextStyle(
                         fontSize: 11, color: AppTheme.textMuted)),
             ]),
@@ -661,6 +679,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       ]),
+      const SizedBox(height: 10),
+
+      // Courbe évolution salariale
+      _SalaryEvolutionChart(
+        points: (s['salary_evolution'] as List<dynamic>?)
+                ?.map((e) => Map<String, dynamic>.from(e as Map))
+                .toList() ??
+            [],
+      ),
     ]);
   }
 
@@ -1058,6 +1085,573 @@ class _LeaveStatusChip extends StatelessWidget {
                                 : status,
             style: TextStyle(
                 fontSize: 10, fontWeight: FontWeight.w700, color: fg)),
+      ]),
+    );
+  }
+}
+
+// ── Courbe évolution salariale ────────────────────────────────────────────────
+
+class _SalaryEvolutionChart extends StatefulWidget {
+  final List<Map<String, dynamic>> points;
+  const _SalaryEvolutionChart({required this.points});
+  @override
+  State<_SalaryEvolutionChart> createState() => _SalaryEvolutionChartState();
+}
+
+class _SalaryEvolutionChartState extends State<_SalaryEvolutionChart> {
+  // 0 = 3 mois, 1 = 6 mois, 2 = tout
+  int _period = 1;
+
+  static const _periodLabels = ['3 mois', '6 mois', 'Tout'];
+  static const _periodMonths = [3, 6, 0]; // 0 = tout
+
+  List<Map<String, dynamic>> get _filtered {
+    if (widget.points.isEmpty) return [];
+    final months = _periodMonths[_period];
+    if (months == 0) return widget.points;
+    final from = widget.points.length - months;
+    return widget.points.sublist(from < 0 ? 0 : from);
+  }
+
+  String _fmtSalary(double v) {
+    if (v >= 1000000) return '${(v / 1000000).toStringAsFixed(1)}M';
+    if (v >= 1000) return '${(v / 1000).toStringAsFixed(0)}k';
+    return v.toStringAsFixed(0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final data = _filtered;
+
+    if (widget.points.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.border)),
+        child: const Row(children: [
+          Icon(Icons.show_chart, size: 16, color: AppTheme.textMuted),
+          SizedBox(width: 8),
+          Text('Aucun historique salarial disponible',
+              style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+        ]),
+      );
+    }
+
+    final salaries = data.map((p) => (p['salary'] as num).toDouble()).toList();
+    final minSal = salaries.reduce((a, b) => a < b ? a : b);
+    final maxSal = salaries.reduce((a, b) => a > b ? a : b);
+    // Marge de 10% en haut/bas, arrondie à la dizaine de millier
+    final padding = ((maxSal - minSal) * 0.15).clamp(10000.0, 50000.0);
+    final yMin = ((minSal - padding) / 10000).floor() * 10000.0;
+    final yMax = ((maxSal + padding) / 10000).ceil() * 10000.0;
+    final yRange = yMax - yMin;
+    final yInterval = (yRange / 4).ceilToDouble();
+
+    // Déterminer si le salaire a changé (pour annotation)
+    final hasChange = salaries.toSet().length > 1;
+
+    // Indice des changements de salaire
+    final changeIndices = <int>{};
+    for (int i = 1; i < salaries.length; i++) {
+      if (salaries[i] != salaries[i - 1]) changeIndices.add(i);
+    }
+
+    final spots = data.asMap().entries.map((e) {
+      return FlSpot(e.key.toDouble(), (e.value['salary'] as num).toDouble());
+    }).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.border),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 6,
+              offset: const Offset(0, 2))
+        ],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // En-tête + sélecteur de période
+        Row(children: [
+          const Icon(Icons.show_chart, size: 16, color: AppTheme.primary),
+          const SizedBox(width: 6),
+          const Expanded(
+            child: Text('ÉVOLUTION SALARIALE',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.primary,
+                    letterSpacing: 0.3)),
+          ),
+          // Sélecteur de période
+          Container(
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            padding: const EdgeInsets.all(2),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              for (int i = 0; i < _periodLabels.length; i++)
+                GestureDetector(
+                  onTap: () => setState(() => _period = i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _period == i
+                          ? AppTheme.primary
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Text(
+                      _periodLabels[i],
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: _period == i
+                              ? Colors.white
+                              : AppTheme.textMuted),
+                    ),
+                  ),
+                ),
+            ]),
+          ),
+        ]),
+        const SizedBox(height: 4),
+
+        // Salaire actuel
+        if (salaries.isNotEmpty) ...[
+          Text(
+            '${_fmtSalary(salaries.last)} F CFA / mois',
+            style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.primary),
+          ),
+          if (hasChange)
+            Builder(builder: (_) {
+              final first = salaries.first;
+              final last = salaries.last;
+              final diff = last - first;
+              final pct = first > 0 ? (diff / first * 100) : 0.0;
+              final up = diff >= 0;
+              return Row(children: [
+                Icon(up ? Icons.trending_up : Icons.trending_down,
+                    size: 12,
+                    color: up ? AppTheme.success : AppTheme.danger),
+                const SizedBox(width: 3),
+                Text(
+                  '${up ? '+' : ''}${_fmtSalary(diff)} F CFA (${pct.toStringAsFixed(1)}%)',
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: up ? AppTheme.success : AppTheme.danger,
+                      fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(width: 4),
+                const Text('sur la période',
+                    style: TextStyle(
+                        fontSize: 10, color: AppTheme.textMuted)),
+              ]);
+            }),
+        ],
+        const SizedBox(height: 14),
+
+        // Graphique
+        SizedBox(
+          height: 150,
+          child: LineChart(
+            LineChartData(
+              minY: yMin,
+              maxY: yMax,
+              clipData: const FlClipData.all(),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: yInterval > 0 ? yInterval : 10000,
+                getDrawingHorizontalLine: (_) => const FlLine(
+                    color: Color(0xFFEEEEEE), strokeWidth: 1),
+              ),
+              borderData: FlBorderData(show: false),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 38,
+                    interval: yInterval > 0 ? yInterval : 10000,
+                    getTitlesWidget: (v, _) => Text(
+                      _fmtSalary(v),
+                      style: const TextStyle(
+                          fontSize: 8, color: AppTheme.textMuted),
+                    ),
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 22,
+                    interval: data.length <= 4
+                        ? 1
+                        : data.length <= 7
+                            ? 2
+                            : (data.length / 4).ceilToDouble(),
+                    getTitlesWidget: (x, _) {
+                      final i = x.toInt();
+                      if (i < 0 || i >= data.length) return const SizedBox();
+                      final label = (data[i]['label'] as String? ?? '')
+                          .split(' ')
+                          .first; // "Jan" seulement
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(label,
+                            style: const TextStyle(
+                                fontSize: 9, color: AppTheme.textMuted)),
+                      );
+                    },
+                  ),
+                ),
+                topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false)),
+              ),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: spots,
+                  isCurved: true,
+                  curveSmoothness: 0.25,
+                  color: AppTheme.primary,
+                  barWidth: 2.5,
+                  isStrokeCapRound: true,
+                  dotData: FlDotData(
+                    show: true,
+                    checkToShowDot: (spot, _) =>
+                        changeIndices.contains(spot.x.toInt()) ||
+                        spot.x == 0 ||
+                        spot.x == spots.length - 1,
+                    getDotPainter: (spot, _, __, ___) => FlDotCirclePainter(
+                      radius: 3.5,
+                      color: Colors.white,
+                      strokeWidth: 2,
+                      strokeColor: AppTheme.primary,
+                    ),
+                  ),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        AppTheme.primary.withOpacity(0.18),
+                        AppTheme.primary.withOpacity(0.0),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+              lineTouchData: LineTouchData(
+                touchTooltipData: LineTouchTooltipData(
+                  getTooltipItems: (spots) => spots.map((s) {
+                    final i = s.x.toInt();
+                    final label =
+                        i < data.length ? (data[i]['label'] as String? ?? '') : '';
+                    return LineTooltipItem(
+                      '$label\n${_fmtSalary(s.y)} F CFA',
+                      const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+// ── Graphique comparaison taux absentéisme / retard ──────────────────────────
+
+class _AttCompareChart extends StatelessWidget {
+  final String prevLabel, currLabel;
+  final double prevAbsRate, currAbsRate;
+  final double prevRetardRate, currRetardRate;
+
+  const _AttCompareChart({
+    required this.prevLabel,
+    required this.currLabel,
+    required this.prevAbsRate,
+    required this.currAbsRate,
+    required this.prevRetardRate,
+    required this.currRetardRate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Valeur max pour l'axe Y (arrondi au 10 supérieur, min 20)
+    final maxVal = [prevAbsRate, currAbsRate, prevRetardRate, currRetardRate, 20.0]
+        .reduce((a, b) => a > b ? a : b);
+    final yMax = ((maxVal / 10).ceil() * 10).toDouble();
+
+    const absColor = AppTheme.danger;
+    const retardColor = AppTheme.warning;
+    const prevOpacity = 0.35;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.border),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 6,
+              offset: const Offset(0, 2))
+        ],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // En-tête
+        const Row(children: [
+          Icon(Icons.bar_chart_rounded, size: 16, color: AppTheme.info),
+          SizedBox(width: 6),
+          Text('ÉVOLUTION ABSENTÉISME & RETARDS',
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.info,
+                  letterSpacing: 0.3)),
+        ]),
+        const SizedBox(height: 12),
+
+        // Légende
+        Row(children: [
+          _Legend(color: absColor.withOpacity(prevOpacity), label: 'Abs. $prevLabel'),
+          const SizedBox(width: 10),
+          _Legend(color: absColor, label: 'Abs. $currLabel'),
+          const SizedBox(width: 10),
+          _Legend(color: retardColor.withOpacity(prevOpacity), label: 'Ret. $prevLabel'),
+          const SizedBox(width: 10),
+          _Legend(color: retardColor, label: 'Ret. $currLabel'),
+        ]),
+        const SizedBox(height: 12),
+
+        SizedBox(
+          height: 160,
+          child: BarChart(
+            BarChartData(
+              maxY: yMax,
+              minY: 0,
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: yMax / 4,
+                getDrawingHorizontalLine: (_) => const FlLine(
+                    color: Color(0xFFEEEEEE), strokeWidth: 1),
+              ),
+              borderData: FlBorderData(show: false),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 30,
+                    interval: yMax / 4,
+                    getTitlesWidget: (v, _) => Text(
+                      '${v.toInt()}%',
+                      style: const TextStyle(
+                          fontSize: 9, color: AppTheme.textMuted),
+                    ),
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (x, _) {
+                      const labels = ['Absentéisme', 'Retards'];
+                      final i = x.toInt();
+                      if (i < 0 || i >= labels.length) return const SizedBox();
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(labels[i],
+                            style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textMuted)),
+                      );
+                    },
+                  ),
+                ),
+                topTitles:
+                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles:
+                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              barGroups: [
+                // Groupe 0 : Absentéisme
+                BarChartGroupData(x: 0, barRods: [
+                  BarChartRodData(
+                    toY: prevAbsRate,
+                    color: absColor.withOpacity(prevOpacity),
+                    width: 22,
+                    borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(4)),
+                    rodStackItems: [],
+                  ),
+                  BarChartRodData(
+                    toY: currAbsRate,
+                    color: absColor,
+                    width: 22,
+                    borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(4)),
+                    rodStackItems: [],
+                  ),
+                ], barsSpace: 4),
+                // Groupe 1 : Retards
+                BarChartGroupData(x: 1, barRods: [
+                  BarChartRodData(
+                    toY: prevRetardRate,
+                    color: retardColor.withOpacity(prevOpacity),
+                    width: 22,
+                    borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(4)),
+                    rodStackItems: [],
+                  ),
+                  BarChartRodData(
+                    toY: currRetardRate,
+                    color: retardColor,
+                    width: 22,
+                    borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(4)),
+                    rodStackItems: [],
+                  ),
+                ], barsSpace: 4),
+              ],
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    final isAbs = group.x == 0;
+                    final isPrev = rodIndex == 0;
+                    final label = isAbs ? 'Absentéisme' : 'Retards';
+                    final period = isPrev ? prevLabel : currLabel;
+                    return BarTooltipItem(
+                      '$label\n$period : ${rod.toY.toStringAsFixed(1)}%',
+                      const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // Indicateurs d'évolution
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(child: _TrendBadge(
+            label: 'Absentéisme',
+            prev: prevAbsRate,
+            curr: currAbsRate,
+            higherIsBad: true,
+          )),
+          const SizedBox(width: 8),
+          Expanded(child: _TrendBadge(
+            label: 'Retards',
+            prev: prevRetardRate,
+            curr: currRetardRate,
+            higherIsBad: true,
+          )),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _Legend extends StatelessWidget {
+  final Color color;
+  final String label;
+  const _Legend({required this.color, required this.label});
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                  color: color, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(width: 4),
+          Text(label,
+              style: const TextStyle(fontSize: 9, color: AppTheme.textMuted)),
+        ],
+      );
+}
+
+class _TrendBadge extends StatelessWidget {
+  final String label;
+  final double prev, curr;
+  final bool higherIsBad;
+  const _TrendBadge(
+      {required this.label,
+      required this.prev,
+      required this.curr,
+      required this.higherIsBad});
+
+  @override
+  Widget build(BuildContext context) {
+    final diff = curr - prev;
+    final improved = higherIsBad ? diff < 0 : diff > 0;
+    final neutral = diff == 0 || prev == 0;
+    final color = neutral
+        ? AppTheme.textMuted
+        : improved
+            ? AppTheme.success
+            : AppTheme.danger;
+    final icon = neutral
+        ? Icons.remove
+        : improved
+            ? Icons.arrow_downward
+            : Icons.arrow_upward;
+    final sign = diff > 0 ? '+' : '';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withOpacity(0.2))),
+      child: Row(children: [
+        Icon(icon, size: 12, color: color),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 9,
+                    color: AppTheme.textMuted,
+                    fontWeight: FontWeight.w500)),
+            Text(
+              neutral
+                  ? 'Stable'
+                  : '$sign${diff.toStringAsFixed(1)}% vs $prev%',
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: color),
+            ),
+          ]),
+        ),
       ]),
     );
   }

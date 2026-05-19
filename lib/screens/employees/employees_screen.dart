@@ -351,7 +351,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                   icon: Icons.euro,
                   label: 'Salaire',
                   value:
-                      '${contract['salary'] ?? '—'} ${contract['currency'] ?? ''}'),
+                      '${contract['salary'] ?? '—'} F CFA'),
               const Divider(),
               InfoRow(
                   icon: Icons.date_range,
