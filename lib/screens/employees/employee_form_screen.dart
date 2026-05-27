@@ -135,10 +135,11 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
           content: Text(_isEdit ? 'Employé mis à jour ✅' : 'Employé créé ✅'),
           backgroundColor: AppTheme.success,
         ));
-        if (context.canPop())
+        if (context.canPop()) {
           context.pop();
-        else
+        } else {
           context.go('/${AuthService.role}/employees');
+        }
       }
     } catch (e) {
       setState(() {
@@ -170,10 +171,11 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            if (context.canPop())
+            if (context.canPop()) {
               context.pop();
-            else
+            } else {
               context.go('/${AuthService.role}/employees');
+            }
           },
         ),
       ),
