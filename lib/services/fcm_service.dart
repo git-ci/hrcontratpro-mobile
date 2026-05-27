@@ -14,7 +14,7 @@ class FcmService {
 
   static final _localNotif = FlutterLocalNotificationsPlugin();
 
-  static const _channelId   = 'hrcontrat_push';
+  static const _channelId = 'hrcontrat_push';
   static const _channelName = 'HrContratPro';
 
   // Stream émis à chaque nouveau message privé reçu en premier plan
@@ -54,14 +54,14 @@ class FcmService {
           msg.hashCode,
           notif.title,
           notif.body,
-          NotificationDetails(
+          const NotificationDetails(
             android: AndroidNotificationDetails(
               _channelId,
               _channelName,
               importance: Importance.high,
               priority: Priority.high,
             ),
-            iOS: const DarwinNotificationDetails(),
+            iOS: DarwinNotificationDetails(),
           ),
         );
       }

@@ -6,9 +6,9 @@ import 'api_service.dart';
 import 'auth_service.dart';
 
 class CheckinReminderService {
-  static const _channelId   = 'checkin_reminder';
+  static const _channelId = 'checkin_reminder';
   static const _channelName = 'Rappel pointage d\'arrivée';
-  static const _baseId      = 2000; // IDs 2000–2006
+  static const _baseId = 2000; // IDs 2000–2006
 
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
@@ -74,7 +74,9 @@ class CheckinReminderService {
         final nextMin = ((now.minute ~/ 5) + 1) * 5;
         final addHour = nextMin >= 60;
         slot = DateTime(
-          now.year, now.month, now.day,
+          now.year,
+          now.month,
+          now.day,
           now.hour + (addHour ? 1 : 0),
           addHour ? nextMin - 60 : nextMin,
         );
@@ -82,8 +84,7 @@ class CheckinReminderService {
         slot = windowStart;
       }
 
-      final deadlineLabel =
-          '${deadline.hour.toString().padLeft(2, '0')}h'
+      final deadlineLabel = '${deadline.hour.toString().padLeft(2, '0')}h'
           '${deadline.minute.toString().padLeft(2, '0')}';
 
       int id = _baseId;
@@ -94,7 +95,7 @@ class CheckinReminderService {
           '⏰ Rappel pointage',
           'Il vous reste $remaining min avant la fermeture ($deadlineLabel). Pointez maintenant !',
           tz.TZDateTime.from(slot, local),
-          NotificationDetails(
+          const NotificationDetails(
             android: AndroidNotificationDetails(
               _channelId,
               _channelName,
@@ -103,7 +104,7 @@ class CheckinReminderService {
               importance: Importance.high,
               priority: Priority.high,
             ),
-            iOS: const DarwinNotificationDetails(
+            iOS: DarwinNotificationDetails(
               presentAlert: true,
               presentBadge: false,
               presentSound: true,
@@ -162,7 +163,9 @@ class CheckinReminderService {
       final parts = hhmm.split(':');
       final now = DateTime.now();
       return DateTime(
-        now.year, now.month, now.day,
+        now.year,
+        now.month,
+        now.day,
         int.parse(parts[0]),
         int.parse(parts.length > 1 ? parts[1] : '0'),
       );
