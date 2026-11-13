@@ -32,7 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await AuthService.login(email, password);
       await CheckinReminderService.requestPermissions();
-      CheckinReminderService.scheduleReminders();
+      await CheckinReminderService.scheduleReminders();
       if (mounted) context.go(AuthService.initialRoute);
     } on ApiException catch (e) {
       setState(() => _error = e.message);

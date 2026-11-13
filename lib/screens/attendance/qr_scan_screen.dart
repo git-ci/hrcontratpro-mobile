@@ -91,13 +91,14 @@ class _QrScanScreenState extends State<QrScanScreen> {
       // Mode scan normal → pointer directement
       await _controller.stop();
       final deviceId = await DeviceService.getDeviceId();
-      final result = await ApiService.scanQr(payload, signature, deviceId: deviceId);
-      CheckinReminderService.cancelReminders();
+      final result =
+          await ApiService.scanQr(payload, signature, deviceId: deviceId);
       setState(() {
         _done = true;
         _success = true;
         _message = result['message'] ?? 'Présence enregistrée !';
       });
+      await CheckinReminderService.cancelReminders();
     } catch (e) {
       final msg = e.toString();
       // Garder _processing = true pour bloquer de nouveaux scans pendant l'affichage
@@ -156,12 +157,14 @@ class _QrScanScreenState extends State<QrScanScreen> {
     try {
       final deviceId = await DeviceService.getDeviceId();
       final result = await ApiService.scanMatricule(
-          mat, _lastPayload!, _lastSignature!, deviceId: deviceId);
+          mat, _lastPayload!, _lastSignature!,
+          deviceId: deviceId);
       setState(() {
         _done = true;
         _success = true;
         _message = result['message'] ?? 'Présence enregistrée !';
       });
+      await CheckinReminderService.cancelReminders();
     } catch (e) {
       final msg = e.toString();
       setState(() {

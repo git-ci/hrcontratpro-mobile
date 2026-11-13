@@ -8,15 +8,16 @@ class AuthService {
   static String? _token;
   static String? _role;
 
-
-  static Map<String, dynamic>? get user  => _user;
-  static String?               get token => _token;
-  static String?               get role  => _role;
+  static Map<String, dynamic>? get user => _user;
+  static String? get token => _token;
+  static String? get role => _role;
   static bool get isLoggedIn => _token != null && _user != null;
 
-  static bool get isDG  => _role == 'dg';
-  static bool get isRH  => _role == 'rh';
+  static bool get isDG => _role == 'dg';
+  static bool get isRH => _role == 'rh';
   static bool get isEmp => _role == 'employee';
+  static bool get canManageContracts =>
+      isDG || (isRH && _user?['can_manage_contracts'] == true);
 
   // ── Chargement au démarrage ──────────────────────────────────────────────────
 
@@ -40,15 +41,16 @@ class AuthService {
     final data = await ApiService.login(email, password);
     await saveSession(
       data['token'] as String,
-      data['user']  as Map<String, dynamic>,
+      data['user'] as Map<String, dynamic>,
     );
   }
 
   /// Persiste un token + user déjà obtenus (setup DG, refresh, etc.)
-  static Future<void> saveSession(String token, Map<String, dynamic> user) async {
+  static Future<void> saveSession(
+      String token, Map<String, dynamic> user) async {
     _token = token;
-    _user  = user;
-    _role  = user['role'] as String?;
+    _user = user;
+    _role = user['role'] as String?;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('auth_token', token);
@@ -61,15 +63,17 @@ class AuthService {
 
   static Future<void> logout() async {
     await FcmService.deleteFcmToken();
-    try { await ApiService.logout(); } catch (_) {}
+    try {
+      await ApiService.logout();
+    } catch (_) {}
     await clearSession();
   }
 
   /// Nettoie la session localement (sans appel API) — utilisé sur 401.
   static Future<void> clearSession() async {
     _token = null;
-    _user  = null;
-    _role  = null;
+    _user = null;
+    _role = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     await prefs.remove('auth_user');
@@ -92,10 +96,14 @@ class AuthService {
 
   static String get initialRoute {
     switch (_role) {
-      case 'dg':       return '/dg/dashboard';
-      case 'rh':       return '/rh/dashboard';
-      case 'employee': return '/emp/dashboard';
-      default:         return '/login';
+      case 'dg':
+        return '/dg/dashboard';
+      case 'rh':
+        return '/rh/dashboard';
+      case 'employee':
+        return '/emp/dashboard';
+      default:
+        return '/login';
     }
   }
 }

@@ -8,10 +8,12 @@ import '../config/app_config.dart';
 class ApiException implements Exception {
   final String message;
   final int? statusCode;
+
   /// Erreurs de validation Laravel : { "field": ["msg1", "msg2"] }
   final Map<String, List<String>> errors;
 
-  ApiException(this.message, {this.statusCode, Map<String, List<String>>? errors})
+  ApiException(this.message,
+      {this.statusCode, Map<String, List<String>>? errors})
       : errors = errors ?? {};
 
   /// Retourne la première erreur du champ donné, ou null.
@@ -171,12 +173,14 @@ class ApiService {
     required String password,
     required String passwordConfirmation,
   }) async =>
-      await request('POST', '/setup/dg', body: {
-        'name':                  name,
-        'email':                 email,
-        'password':              password,
-        'password_confirmation': passwordConfirmation,
-      }, auth: false) as Map<String, dynamic>;
+      await request('POST', '/setup/dg',
+          body: {
+            'name': name,
+            'email': email,
+            'password': password,
+            'password_confirmation': passwordConfirmation,
+          },
+          auth: false) as Map<String, dynamic>;
 
   static Future<Map<String, dynamic>> login(
           String email, String password) async =>
@@ -214,7 +218,8 @@ class ApiService {
   /// L'endpoint retourne {"base64": "...", "mime_type": "..."}.
   static Future<Uint8List?> getProfilePhotoBytes() async {
     try {
-      final data = await request('GET', '/auth/profile/photo') as Map<String, dynamic>;
+      final data =
+          await request('GET', '/auth/profile/photo') as Map<String, dynamic>;
       final b64 = data['base64'] as String?;
       if (b64 == null || b64.isEmpty) return null;
       return base64Decode(b64);
@@ -266,6 +271,48 @@ class ApiService {
           int id, File photo) async =>
       await uploadFile('/users/$id/photo', photo, 'photo')
           as Map<String, dynamic>;
+
+  static Future<List<dynamic>> getEmployeeDocuments({int? userId}) async =>
+      await request('GET',
+              '/employee-documents${userId != null ? '?user_id=$userId' : ''}')
+          as List<dynamic>;
+
+  static Future<List<dynamic>> getEmployeeDocumentCounts() async =>
+      await request('GET', '/employee-documents/counts') as List<dynamic>;
+
+  static Future<Map<String, dynamic>> uploadEmployeeDocument(
+      int userId, String title, File file) async {
+    final token = await getToken();
+    final req =
+        http.MultipartRequest('POST', Uri.parse('$_base/employee-documents'));
+    if (token != null) req.headers['Authorization'] = 'Bearer $token';
+    req.headers['Accept'] = 'application/json';
+    req.fields['user_id'] = userId.toString();
+    req.fields['title'] = title;
+    req.files.add(await http.MultipartFile.fromPath('document', file.path));
+    final streamed = await req.send().timeout(const Duration(seconds: 30));
+    final response = await http.Response.fromStream(streamed);
+    final json = jsonDecode(utf8.decode(response.bodyBytes));
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return json as Map<String, dynamic>;
+    }
+    final message = json is Map && json['message'] != null
+        ? json['message'] as String
+        : 'Erreur upload';
+    Map<String, List<String>> errors = {};
+    if (json is Map && json['errors'] is Map) {
+      (json['errors'] as Map).forEach((key, value) {
+        if (value is List) {
+          errors[key as String] = value.map((item) => item.toString()).toList();
+        }
+      });
+    }
+    throw ApiException(message,
+        statusCode: response.statusCode, errors: errors);
+  }
+
+  static Future<Uint8List> downloadEmployeeDocument(int id) =>
+      downloadBytes('/employee-documents/$id/file');
 
   static Future<void> deleteUserPhoto(int id) async =>
       await request('DELETE', '/users/$id/photo');
@@ -333,7 +380,8 @@ class ApiService {
   static Future<void> deletePayslip(int id) async =>
       await request('DELETE', '/payslips/$id');
 
-  static Future<Map<String, dynamic>> uploadPayslipPdf(int id, File pdf) async =>
+  static Future<Map<String, dynamic>> uploadPayslipPdf(
+          int id, File pdf) async =>
       await uploadFile('/payslips/$id/pdf', pdf, 'pdf') as Map<String, dynamic>;
 
   static Future<Uint8List> downloadPayslipPdf(int id) =>
@@ -384,8 +432,7 @@ class ApiService {
 
   // ── Congés ───────────────────────────────────────────────────────────────────
 
-  static Future<dynamic> getLeavePlans(
-          {int page = 1, String? status}) async =>
+  static Future<dynamic> getLeavePlans({int page = 1, String? status}) async =>
       await request('GET',
           '/leave-plans?page=$page${status != null ? '&status=$status' : ''}');
 
@@ -413,9 +460,11 @@ class ApiService {
 
   // ── Demandes de contrat ───────────────────────────────────────────────────────
 
-  static Future<Map<String, dynamic>> getRequests({int page = 1, String? status}) async {
+  static Future<Map<String, dynamic>> getRequests(
+      {int page = 1, String? status}) async {
     final q = ['page=$page', if (status != null) 'status=$status'].join('&');
-    return await request('GET', '/contract-requests?$q') as Map<String, dynamic>;
+    return await request('GET', '/contract-requests?$q')
+        as Map<String, dynamic>;
   }
 
   static Future<Map<String, dynamic>> getRequest(int id) async =>
@@ -475,16 +524,21 @@ class ApiService {
   static Future<List<dynamic>> getMessages(int userId) async =>
       await request('GET', '/messages/$userId') as List<dynamic>;
 
-  static Future<Map<String, dynamic>> sendMessage(int userId, String body) async =>
-      await request('POST', '/messages/$userId', body: {'body': body}) as Map<String, dynamic>;
+  static Future<Map<String, dynamic>> sendMessage(
+          int userId, String body) async =>
+      await request('POST', '/messages/$userId', body: {'body': body})
+          as Map<String, dynamic>;
 
   static Future<int> getUnreadMessagesCount() async {
-    final data = await request('GET', '/messages/unread-count') as Map<String, dynamic>;
+    final data =
+        await request('GET', '/messages/unread-count') as Map<String, dynamic>;
     return (data['count'] as num?)?.toInt() ?? 0;
   }
 
-  static Future<Map<String, dynamic>> editMessage(int msgId, String body) async =>
-      await request('PUT', '/messages/$msgId', body: {'body': body}) as Map<String, dynamic>;
+  static Future<Map<String, dynamic>> editMessage(
+          int msgId, String body) async =>
+      await request('PUT', '/messages/$msgId', body: {'body': body})
+          as Map<String, dynamic>;
 
   static Future<void> deleteMessage(int msgId) async =>
       await request('DELETE', '/messages/$msgId');
@@ -498,11 +552,15 @@ class ApiService {
     return [];
   }
 
-  static Future<Map<String, dynamic>> createAnnouncement(Map<String, dynamic> data) async =>
-      await request('POST', '/announcements', body: data) as Map<String, dynamic>;
+  static Future<Map<String, dynamic>> createAnnouncement(
+          Map<String, dynamic> data) async =>
+      await request('POST', '/announcements', body: data)
+          as Map<String, dynamic>;
 
-  static Future<Map<String, dynamic>> editAnnouncement(int id, Map<String, dynamic> data) async =>
-      await request('PUT', '/announcements/$id', body: data) as Map<String, dynamic>;
+  static Future<Map<String, dynamic>> editAnnouncement(
+          int id, Map<String, dynamic> data) async =>
+      await request('PUT', '/announcements/$id', body: data)
+          as Map<String, dynamic>;
 
   static Future<void> deleteAnnouncement(int id) async =>
       await request('DELETE', '/announcements/$id');
@@ -510,30 +568,35 @@ class ApiService {
   // ── Demandes de permission ────────────────────────────────────────────────
 
   static Future<Map<String, dynamic>> getPermissionRequests(
-          {String? status, int? userId}) async {
+      {String? status, int? userId}) async {
     final params = <String>[];
     if (status != null) params.add('status=$status');
     if (userId != null) params.add('user_id=$userId');
     final qs = params.isNotEmpty ? '?${params.join('&')}' : '';
-    return await request('GET', '/permission-requests$qs') as Map<String, dynamic>;
+    return await request('GET', '/permission-requests$qs')
+        as Map<String, dynamic>;
   }
 
   static Future<Map<String, dynamic>> getPermissionRequest(int id) async =>
       await request('GET', '/permission-requests/$id') as Map<String, dynamic>;
 
   static Future<Map<String, dynamic>> createPermissionRequest(
-      Map<String, dynamic> data, {File? justificatif}) async {
+      Map<String, dynamic> data,
+      {File? justificatif}) async {
     if (justificatif != null) {
-      return _postPermissionWithFile('/permission-requests', data, justificatif);
+      return _postPermissionWithFile(
+          '/permission-requests', data, justificatif);
     }
     return await request('POST', '/permission-requests', body: data)
         as Map<String, dynamic>;
   }
 
   static Future<Map<String, dynamic>> updatePermissionRequest(
-      int id, Map<String, dynamic> data, {File? justificatif}) async {
+      int id, Map<String, dynamic> data,
+      {File? justificatif}) async {
     if (justificatif != null) {
-      return _postPermissionWithFile('/permission-requests/$id/update', data, justificatif);
+      return _postPermissionWithFile(
+          '/permission-requests/$id/update', data, justificatif);
     }
     return await request('POST', '/permission-requests/$id/update', body: data)
         as Map<String, dynamic>;
@@ -543,29 +606,30 @@ class ApiService {
       await request('DELETE', '/permission-requests/$id');
 
   static Future<Map<String, dynamic>> resubmitPermissionRequest(
-      int id, Map<String, dynamic> data, {File? justificatif}) async {
+      int id, Map<String, dynamic> data,
+      {File? justificatif}) async {
     if (justificatif != null) {
       return _postPermissionWithFile(
           '/permission-requests/$id/resubmit', data, justificatif);
     }
-    return await request('POST', '/permission-requests/$id/resubmit', body: data)
-        as Map<String, dynamic>;
+    return await request('POST', '/permission-requests/$id/resubmit',
+        body: data) as Map<String, dynamic>;
   }
 
   static Future<Map<String, dynamic>> _postPermissionWithFile(
       String endpoint, Map<String, dynamic> data, File file) async {
-    final base  = _base;
+    final base = _base;
     final token = await getToken();
-    final req   = http.MultipartRequest('POST', Uri.parse('$base$endpoint'));
+    final req = http.MultipartRequest('POST', Uri.parse('$base$endpoint'));
     if (token != null) req.headers['Authorization'] = 'Bearer $token';
     req.headers['Accept'] = 'application/json';
     data.forEach((key, value) {
       if (value != null) req.fields[key] = value.toString();
     });
     req.files.add(await http.MultipartFile.fromPath('justificatif', file.path));
-    final streamed  = await req.send().timeout(const Duration(seconds: 60));
-    final response  = await http.Response.fromStream(streamed);
-    final json      = jsonDecode(utf8.decode(response.bodyBytes));
+    final streamed = await req.send().timeout(const Duration(seconds: 60));
+    final response = await http.Response.fromStream(streamed);
+    final json = jsonDecode(utf8.decode(response.bodyBytes));
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return Map<String, dynamic>.from(json as Map);
     }

@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:developer' as developer;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'api_service.dart';
@@ -8,7 +10,9 @@ import 'auth_service.dart';
 class CheckinReminderService {
   static const _channelId = 'checkin_reminder';
   static const _channelName = 'Rappel pointage d\'arrivée';
-  static const _baseId = 2000; // IDs 2000–2006
+  static const _notificationId = 2000;
+  static const _legacyNotificationCount = 7;
+  static const _lastReminderDateKey = 'checkin_reminder_last_date';
 
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
@@ -38,22 +42,22 @@ class CheckinReminderService {
               IOSFlutterLocalNotificationsPlugin>()
           ?.requestPermissions(alert: true, badge: true, sound: true);
     } else if (Platform.isAndroid) {
-      await _plugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.requestNotificationsPermission();
+      final android = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      await android?.requestNotificationsPermission();
+      if (await android?.canScheduleExactNotifications() == false) {
+        await android?.requestExactAlarmsPermission();
+      }
     }
   }
 
   // ── Scheduling ────────────────────────────────────────────────────────────
 
-  /// Planifie jusqu'à 7 rappels toutes les 5 min dans la fenêtre [deadline-30min, deadline[.
-  /// Ne fait rien si : week-end, déjà pointé, ou heure dépassée.
+  /// Programme un rappel unique 15 minutes avant la fermeture du pointage.
   static Future<void> scheduleReminders() async {
-    if (!AuthService.isLoggedIn) return;
-
     try {
       await cancelReminders();
+      if (!AuthService.isLoggedIn) return;
 
       final now = DateTime.now();
       if (now.weekday == DateTime.saturday || now.weekday == DateTime.sunday) {
@@ -65,112 +69,147 @@ class CheckinReminderService {
       final deadline = await _fetchEarliestDeadline();
       if (deadline == null || now.isAfter(deadline)) return;
 
-      final windowStart = deadline.subtract(const Duration(minutes: 30));
-      final local = tz.local;
-
-      // Si on est déjà dans la fenêtre, partir de la prochaine tranche de 5 min
-      DateTime slot;
-      if (now.isAfter(windowStart)) {
-        final nextMin = ((now.minute ~/ 5) + 1) * 5;
-        final addHour = nextMin >= 60;
-        slot = DateTime(
-          now.year,
-          now.month,
-          now.day,
-          now.hour + (addHour ? 1 : 0),
-          addHour ? nextMin - 60 : nextMin,
-        );
-      } else {
-        slot = windowStart;
-      }
-
+      final reminderTime = deadline.subtract(const Duration(minutes: 15));
       final deadlineLabel = '${deadline.hour.toString().padLeft(2, '0')}h'
           '${deadline.minute.toString().padLeft(2, '0')}';
+      const details = NotificationDetails(
+        android: AndroidNotificationDetails(
+          _channelId,
+          _channelName,
+          channelDescription:
+              'Rappel 15 minutes avant la fermeture du pointage d\'arrivée',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: false,
+          presentSound: true,
+        ),
+      );
+      final prefs = await SharedPreferences.getInstance();
+      final today = _dateKey(now);
+      final lastReminderDate = prefs.getString(_lastReminderDateKey);
 
-      int id = _baseId;
-      while (slot.isBefore(deadline) && id < _baseId + 7) {
-        final remaining = deadline.difference(slot).inMinutes;
-        await _plugin.zonedSchedule(
-          id++,
-          '⏰ Rappel pointage',
-          'Il vous reste $remaining min avant la fermeture ($deadlineLabel). Pointez maintenant !',
-          tz.TZDateTime.from(slot, local),
-          const NotificationDetails(
-            android: AndroidNotificationDetails(
-              _channelId,
-              _channelName,
-              channelDescription:
-                  'Rappels avant la fermeture du pointage d\'arrivée',
-              importance: Importance.high,
-              priority: Priority.high,
-            ),
-            iOS: DarwinNotificationDetails(
-              presentAlert: true,
-              presentBadge: false,
-              presentSound: true,
-            ),
-          ),
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-        );
-        slot = slot.add(const Duration(minutes: 5));
+      if (!reminderTime.isAfter(now)) {
+        if (lastReminderDate != today) {
+          final remaining = deadline.difference(now).inMinutes;
+          await _plugin.show(
+            _notificationId,
+            '⏰ Rappel pointage',
+            'Il vous reste $remaining min avant la fermeture ($deadlineLabel). Pointez maintenant !',
+            details,
+          );
+          await prefs.setString(_lastReminderDateKey, today);
+        }
+        return;
       }
-    } catch (_) {
-      // Fonctionnalité non critique — silencieux
+
+      final android = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      final canScheduleExactly = Platform.isAndroid &&
+          await android?.canScheduleExactNotifications() == true;
+      if (Platform.isAndroid && !canScheduleExactly) {
+        developer.log(
+          'Exact alarms unavailable; scheduling the check-in reminder inexactly.',
+          name: 'CheckinReminderService',
+          level: 900,
+        );
+      }
+
+      await _plugin.zonedSchedule(
+        _notificationId,
+        '⏰ Rappel pointage',
+        'Il vous reste 15 min avant la fermeture ($deadlineLabel). Pointez maintenant !',
+        tz.TZDateTime.from(reminderTime, tz.local),
+        details,
+        androidScheduleMode: canScheduleExactly
+            ? AndroidScheduleMode.exactAllowWhileIdle
+            : AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+      await prefs.setString(_lastReminderDateKey, today);
+    } catch (error, stackTrace) {
+      developer.log(
+        'Unable to schedule the check-in reminder.',
+        name: 'CheckinReminderService',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 
   static Future<void> cancelReminders() async {
-    for (int i = _baseId; i < _baseId + 7; i++) {
-      await _plugin.cancel(i);
+    final failedIds = <int>[];
+    Object? firstError;
+    StackTrace? firstStackTrace;
+    for (var id = _notificationId;
+        id < _notificationId + _legacyNotificationCount;
+        id++) {
+      try {
+        await _plugin.cancel(id);
+      } catch (error, stackTrace) {
+        failedIds.add(id);
+        firstError ??= error;
+        firstStackTrace ??= stackTrace;
+      }
+    }
+
+    if (failedIds.isNotEmpty) {
+      developer.log(
+        'Could not cancel reminder notifications: ${failedIds.join(', ')}.',
+        name: 'CheckinReminderService',
+        error: firstError,
+        stackTrace: firstStackTrace,
+      );
     }
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   static Future<bool> _isCheckedInToday() async {
-    try {
-      final now = DateTime.now();
-      final todayStr =
-          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final now = DateTime.now();
+    final todayStr = _dateKey(now);
+    final data = await ApiService.getMyAttendance();
+    final records = data['records'] as List;
 
-      final data = await ApiService.getMyAttendance();
-      final records = (data['records'] as List?) ?? [];
-
-      return records.any((r) =>
-          r['date'] == todayStr &&
-          (r['status'] == 'present' || r['status'] == 'mission'));
-    } catch (_) {
-      return false;
-    }
+    return records.any((r) =>
+        r['date'] == todayStr &&
+        (r['status'] == 'present' ||
+            r['status'] == 'retard' ||
+            r['status'] == 'mission'));
   }
 
   static Future<DateTime?> _fetchEarliestDeadline() async {
-    try {
-      final sites = await ApiService.getAttendanceSites();
-      if (sites.isEmpty) return null;
-
-      String? earliest;
-      for (final site in sites) {
-        final d = site['checkin_deadline'] as String?;
-        if (d != null && d.isNotEmpty) {
-          if (earliest == null || d.compareTo(earliest) < 0) earliest = d;
-        }
+    final sites = await ApiService.getAttendanceSites();
+    String? earliest;
+    for (final site in sites) {
+      if (site['active'] != true) continue;
+      final deadline = site['checkin_deadline'] as String?;
+      if (deadline != null &&
+          deadline.isNotEmpty &&
+          (earliest == null || deadline.compareTo(earliest) < 0)) {
+        earliest = deadline;
       }
-
-      final hhmm = earliest ?? '10:00';
-      final parts = hhmm.split(':');
-      final now = DateTime.now();
-      return DateTime(
-        now.year,
-        now.month,
-        now.day,
-        int.parse(parts[0]),
-        int.parse(parts.length > 1 ? parts[1] : '0'),
-      );
-    } catch (_) {
-      return null;
     }
+    if (earliest == null) return null;
+
+    final parts = earliest.split(':');
+    if (parts.length < 2) {
+      throw FormatException('Invalid check-in deadline: $earliest');
+    }
+    final now = DateTime.now();
+    return DateTime(
+      now.year,
+      now.month,
+      now.day,
+      int.parse(parts[0]),
+      int.parse(parts[1]),
+    );
   }
+
+  static String _dateKey(DateTime date) =>
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
 }

@@ -65,11 +65,11 @@ class _AppDrawerState extends State<AppDrawer> {
 
   @override
   Widget build(BuildContext context) {
-    final user      = AuthService.user;
-    final name      = user?['name'] ?? '';
-    final email     = user?['email'] ?? '';
-    final prefix    = widget.role == 'employee' ? 'emp' : widget.role;
-    final location  = GoRouterState.of(context).matchedLocation;
+    final user = AuthService.user;
+    final name = user?['name'] ?? '';
+    final email = user?['email'] ?? '';
+    final prefix = widget.role == 'employee' ? 'emp' : widget.role;
+    final location = GoRouterState.of(context).matchedLocation;
 
     final roleLabel = widget.role == 'dg'
         ? 'Direction Générale'
@@ -82,7 +82,14 @@ class _AppDrawerState extends State<AppDrawer> {
             ? AppTheme.rhColor
             : AppTheme.empColor;
 
-    final items = _navItems(prefix);
+    final items = _navItems(prefix)
+        .where((item) =>
+            ![
+              '/rh/contracts',
+              '/rh/payslips',
+            ].contains(item.route) ||
+            AuthService.canManageContracts)
+        .toList();
 
     return Drawer(
       child: Column(children: [
@@ -125,8 +132,7 @@ class _AppDrawerState extends State<AppDrawer> {
                   const SizedBox(height: 2),
                   Text(email,
                       style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.white.withOpacity(0.8)),
+                          fontSize: 12, color: Colors.white.withOpacity(0.8)),
                       overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 8),
                   Container(
@@ -157,13 +163,11 @@ class _AppDrawerState extends State<AppDrawer> {
               return ListTile(
                 dense: true,
                 leading: Icon(item.icon,
-                    color: isActive ? roleColor : AppTheme.textMuted,
-                    size: 22),
+                    color: isActive ? roleColor : AppTheme.textMuted, size: 22),
                 title: Text(item.label,
                     style: TextStyle(
                       color: isActive ? roleColor : null,
-                      fontWeight:
-                          isActive ? FontWeight.w600 : FontWeight.w400,
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                       fontSize: 14,
                     )),
                 selected: isActive,
@@ -216,41 +220,58 @@ class _AppDrawerState extends State<AppDrawer> {
     switch (prefix) {
       case 'dg':
         return const [
-          _DrawerItem('/dg/dashboard',    Icons.dashboard_outlined,     'Tableau de bord'),
-          _DrawerItem('/dg/employees',    Icons.people_outline,         'Employés'),
-          _DrawerItem('/dg/attendance',   Icons.schedule_outlined,      'Pointage'),
-          _DrawerItem('/dg/contracts',    Icons.description_outlined,   'Contrats'),
-          _DrawerItem('/dg/payslips',     Icons.receipt_long_outlined,  'Mon bulletin'),
-          _DrawerItem('/dg/requests',     Icons.assignment_outlined,    'Demandes'),
-          _DrawerItem('/dg/leaves',       Icons.beach_access_outlined,  'Congés'),
-          _DrawerItem('/dg/messaging',    Icons.forum_outlined,         'Messagerie'),
-          _DrawerItem('/dg/permissions',  Icons.event_note_outlined,    'Permissions'),
-          _DrawerItem('/dg/notifications',Icons.notifications_outlined, 'Notifications'),
+          _DrawerItem(
+              '/dg/dashboard', Icons.dashboard_outlined, 'Tableau de bord'),
+          _DrawerItem('/dg/employees', Icons.people_outline, 'Employés'),
+          _DrawerItem('/dg/attendance', Icons.schedule_outlined, 'Pointage'),
+          _DrawerItem('/dg/contracts', Icons.description_outlined, 'Contrats'),
+          _DrawerItem(
+              '/dg/payslips', Icons.receipt_long_outlined, 'Mon bulletin'),
+          _DrawerItem('/dg/documents', Icons.folder_outlined, 'Mes documents'),
+          _DrawerItem('/dg/requests', Icons.assignment_outlined, 'Demandes'),
+          _DrawerItem('/dg/leaves', Icons.beach_access_outlined, 'Congés'),
+          _DrawerItem('/dg/messaging', Icons.forum_outlined, 'Messagerie'),
+          _DrawerItem(
+              '/dg/permissions', Icons.event_note_outlined, 'Permissions'),
+          _DrawerItem('/dg/notifications', Icons.notifications_outlined,
+              'Notifications'),
         ];
       case 'rh':
         return const [
-          _DrawerItem('/rh/dashboard',    Icons.dashboard_outlined,     'Tableau de bord'),
-          _DrawerItem('/rh/employees',    Icons.people_outline,         'Employés'),
-          _DrawerItem('/rh/attendance',   Icons.schedule_outlined,      'Pointage'),
-          _DrawerItem('/rh/contracts',    Icons.description_outlined,   'Contrats'),
-          _DrawerItem('/rh/payslips',     Icons.receipt_long_outlined,  'Bulletins de salaire'),
-          _DrawerItem('/rh/requests',     Icons.assignment_outlined,    'Demandes'),
-          _DrawerItem('/rh/leaves',       Icons.beach_access_outlined,  'Congés'),
-          _DrawerItem('/rh/messaging',    Icons.forum_outlined,         'Messagerie'),
-          _DrawerItem('/rh/permissions',  Icons.event_note_outlined,    'Permissions'),
-          _DrawerItem('/rh/notifications',Icons.notifications_outlined, 'Notifications'),
+          _DrawerItem(
+              '/rh/dashboard', Icons.dashboard_outlined, 'Tableau de bord'),
+          _DrawerItem('/rh/employees', Icons.people_outline, 'Employés'),
+          _DrawerItem('/rh/attendance', Icons.schedule_outlined, 'Pointage'),
+          _DrawerItem(
+              '/rh/my-payslips', Icons.receipt_long_outlined, 'Mes bulletins'),
+          _DrawerItem('/rh/documents', Icons.folder_outlined, 'Documents'),
+          _DrawerItem('/rh/contracts', Icons.description_outlined, 'Contrats'),
+          _DrawerItem('/rh/payslips', Icons.receipt_long_outlined,
+              'Bulletins de salaire'),
+          _DrawerItem('/rh/requests', Icons.assignment_outlined, 'Demandes'),
+          _DrawerItem('/rh/leaves', Icons.beach_access_outlined, 'Congés'),
+          _DrawerItem('/rh/messaging', Icons.forum_outlined, 'Messagerie'),
+          _DrawerItem(
+              '/rh/permissions', Icons.event_note_outlined, 'Permissions'),
+          _DrawerItem('/rh/notifications', Icons.notifications_outlined,
+              'Notifications'),
         ];
       default: // emp
         return const [
-          _DrawerItem('/emp/dashboard',    Icons.home_outlined,          'Accueil'),
-          _DrawerItem('/emp/scan',         Icons.qr_code_scanner,        'Scanner QR'),
-          _DrawerItem('/emp/attendance',   Icons.schedule_outlined,      'Pointage'),
-          _DrawerItem('/emp/contracts',    Icons.description_outlined,   'Mes contrats'),
-          _DrawerItem('/emp/payslips',     Icons.receipt_long_outlined,  'Mes bulletins'),
-          _DrawerItem('/emp/leaves',       Icons.beach_access_outlined,  'Mes congés'),
-          _DrawerItem('/emp/messaging',    Icons.forum_outlined,         'Messagerie'),
-          _DrawerItem('/emp/permissions',  Icons.event_note_outlined,    'Permissions'),
-          _DrawerItem('/emp/notifications',Icons.notifications_outlined, 'Notifications'),
+          _DrawerItem('/emp/dashboard', Icons.home_outlined, 'Accueil'),
+          _DrawerItem('/emp/scan', Icons.qr_code_scanner, 'Scanner QR'),
+          _DrawerItem('/emp/attendance', Icons.schedule_outlined, 'Pointage'),
+          _DrawerItem(
+              '/emp/contracts', Icons.description_outlined, 'Mes contrats'),
+          _DrawerItem(
+              '/emp/payslips', Icons.receipt_long_outlined, 'Mes bulletins'),
+          _DrawerItem('/emp/documents', Icons.folder_outlined, 'Mes documents'),
+          _DrawerItem('/emp/leaves', Icons.beach_access_outlined, 'Mes congés'),
+          _DrawerItem('/emp/messaging', Icons.forum_outlined, 'Messagerie'),
+          _DrawerItem(
+              '/emp/permissions', Icons.event_note_outlined, 'Permissions'),
+          _DrawerItem('/emp/notifications', Icons.notifications_outlined,
+              'Notifications'),
         ];
     }
   }

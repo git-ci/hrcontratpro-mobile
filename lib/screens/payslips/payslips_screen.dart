@@ -11,13 +11,25 @@ import '../../widgets/app_drawer.dart';
 import '../../widgets/announcement_banner.dart';
 
 const List<String> _months = [
-  '', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+  '',
+  'Janvier',
+  'Février',
+  'Mars',
+  'Avril',
+  'Mai',
+  'Juin',
+  'Juillet',
+  'Août',
+  'Septembre',
+  'Octobre',
+  'Novembre',
+  'Décembre',
 ];
 
 // ── Écran principal ───────────────────────────────────────────────────────────
 class PayslipsScreen extends StatefulWidget {
-  const PayslipsScreen({super.key});
+  final bool myOwnOnly;
+  const PayslipsScreen({super.key, this.myOwnOnly = false});
   @override
   State<PayslipsScreen> createState() => _PayslipsScreenState();
 }
@@ -27,7 +39,7 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
   bool _loading = true;
   String? _error;
 
-  bool get _isRh => AuthService.isRH;
+  bool get _canManage => AuthService.isRH && !widget.myOwnOnly;
 
   @override
   void initState() {
@@ -36,9 +48,12 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      if (_isRh) {
+      if (_canManage) {
         final res = await ApiService.getPayslips(params: '?per_page=500');
         setState(() => _payslips = res['data'] ?? []);
       } else {
@@ -57,9 +72,9 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: const DrawerMenuButton(),
-        title: Text(_isRh ? 'Bulletins de salaire' : 'Mes bulletins'),
+        title: Text(_canManage ? 'Bulletins de salaire' : 'Mes bulletins'),
         actions: [
-          if (_isRh)
+          if (_canManage)
             IconButton(
               icon: const Icon(Icons.add),
               tooltip: 'Nouveau bulletin',
@@ -82,18 +97,22 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
 
   Widget _buildBody() {
     if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_error != null) return Center(child: Text(_error!, style: const TextStyle(color: AppTheme.danger)));
+    if (_error != null)
+      return Center(
+          child: Text(_error!, style: const TextStyle(color: AppTheme.danger)));
     if (_payslips.isEmpty) {
       return const Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.receipt_long_outlined, size: 64, color: AppTheme.textMuted),
+          Icon(Icons.receipt_long_outlined,
+              size: 64, color: AppTheme.textMuted),
           SizedBox(height: 12),
-          Text('Aucun bulletin disponible', style: TextStyle(color: AppTheme.textMuted, fontSize: 16)),
+          Text('Aucun bulletin disponible',
+              style: TextStyle(color: AppTheme.textMuted, fontSize: 16)),
         ]),
       );
     }
 
-    if (_isRh) return _buildRhList();
+    if (_canManage) return _buildRhList();
     return _buildEmployeeList();
   }
 
@@ -116,14 +135,18 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
         itemBuilder: (ctx, i) {
           final year = years[i];
           final slips = byYear[year]!;
-          return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text('$year', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            ),
-            ...slips.map((s) => _RhPayslipTile(slip: s, onRefresh: _load)),
-            const SizedBox(height: 8),
-          ]);
+          return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text('$year',
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w700)),
+                ),
+                ...slips.map((s) => _RhPayslipTile(slip: s, onRefresh: _load)),
+                const SizedBox(height: 8),
+              ]);
         },
       ),
     );
@@ -147,14 +170,18 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
         itemBuilder: (ctx, i) {
           final year = years[i];
           final slips = byYear[year]!;
-          return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text('$year', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            ),
-            ...slips.map((s) => _EmpPayslipTile(slip: s)),
-            const SizedBox(height: 8),
-          ]);
+          return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text('$year',
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w700)),
+                ),
+                ...slips.map((s) => _EmpPayslipTile(slip: s)),
+                const SizedBox(height: 8),
+              ]);
         },
       ),
     );
@@ -174,7 +201,7 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
 
     int? selectedUserId;
     int selectedMonth = DateTime.now().month;
-    int selectedYear  = DateTime.now().year;
+    int selectedYear = DateTime.now().year;
     File? selectedPdf;
     bool uploading = false;
     String? err;
@@ -192,10 +219,12 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
               DropdownButtonFormField<int>(
                 decoration: const InputDecoration(labelText: 'Employé *'),
                 value: selectedUserId,
-                items: employees.map<DropdownMenuItem<int>>((e) => DropdownMenuItem(
-                  value: e['id'] as int,
-                  child: Text(e['name'] as String? ?? ''),
-                )).toList(),
+                items: employees
+                    .map<DropdownMenuItem<int>>((e) => DropdownMenuItem(
+                          value: e['id'] as int,
+                          child: Text(e['name'] as String? ?? ''),
+                        ))
+                    .toList(),
                 onChanged: (v) => setDlgState(() => selectedUserId = v),
               ),
               const SizedBox(height: 12),
@@ -204,9 +233,12 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
                   child: DropdownButtonFormField<int>(
                     decoration: const InputDecoration(labelText: 'Mois'),
                     value: selectedMonth,
-                    items: List.generate(12, (i) => DropdownMenuItem(
-                      value: i + 1, child: Text(_months[i + 1]),
-                    )),
+                    items: List.generate(
+                        12,
+                        (i) => DropdownMenuItem(
+                              value: i + 1,
+                              child: Text(_months[i + 1]),
+                            )),
                     onChanged: (v) => setDlgState(() => selectedMonth = v!),
                   ),
                 ),
@@ -215,7 +247,10 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
                   child: DropdownButtonFormField<int>(
                     decoration: const InputDecoration(labelText: 'Année'),
                     value: selectedYear,
-                    items: years.map((y) => DropdownMenuItem(value: y, child: Text('$y'))).toList(),
+                    items: years
+                        .map((y) =>
+                            DropdownMenuItem(value: y, child: Text('$y')))
+                        .toList(),
                     onChanged: (v) => setDlgState(() => selectedYear = v!),
                   ),
                 ),
@@ -228,50 +263,71 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
                     : 'Joindre le PDF'),
                 onPressed: () async {
                   final result = await FilePicker.platform.pickFiles(
-                    type: FileType.custom, allowedExtensions: ['pdf'],
+                    type: FileType.custom,
+                    allowedExtensions: ['pdf'],
                   );
                   if (result != null && result.files.isNotEmpty) {
-                    setDlgState(() => selectedPdf = File(result.files.first.path!));
+                    setDlgState(
+                        () => selectedPdf = File(result.files.first.path!));
                   }
                 },
               ),
               if (err != null) ...[
                 const SizedBox(height: 8),
-                Text(err!, style: const TextStyle(color: AppTheme.danger, fontSize: 13)),
+                Text(err!,
+                    style:
+                        const TextStyle(color: AppTheme.danger, fontSize: 13)),
               ],
             ]),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Annuler')),
             FilledButton(
-              onPressed: uploading ? null : () async {
-                if (selectedUserId == null) {
-                  setDlgState(() => err = 'Sélectionnez un employé.');
-                  return;
-                }
-                setDlgState(() { uploading = true; err = null; });
-                try {
-                  final slip = await ApiService.createPayslip({
-                    'user_id': selectedUserId,
-                    'month':   selectedMonth,
-                    'year':    selectedYear,
-                  });
-                  if (selectedPdf != null) {
-                    await ApiService.uploadPayslipPdf(slip['id'] as int, selectedPdf!);
-                  }
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  _load();
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Bulletin enregistré avec succès.')),
-                    );
-                  }
-                } catch (e) {
-                  setDlgState(() { uploading = false; err = e.toString(); });
-                }
-              },
+              onPressed: uploading
+                  ? null
+                  : () async {
+                      if (selectedUserId == null) {
+                        setDlgState(() => err = 'Sélectionnez un employé.');
+                        return;
+                      }
+                      setDlgState(() {
+                        uploading = true;
+                        err = null;
+                      });
+                      try {
+                        final slip = await ApiService.createPayslip({
+                          'user_id': selectedUserId,
+                          'month': selectedMonth,
+                          'year': selectedYear,
+                        });
+                        if (selectedPdf != null) {
+                          await ApiService.uploadPayslipPdf(
+                              slip['id'] as int, selectedPdf!);
+                        }
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        _load();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content:
+                                    Text('Bulletin enregistré avec succès.')),
+                          );
+                        }
+                      } catch (e) {
+                        setDlgState(() {
+                          uploading = false;
+                          err = e.toString();
+                        });
+                      }
+                    },
               child: uploading
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
                   : const Text('Enregistrer'),
             ),
           ],
@@ -293,7 +349,7 @@ class _RhPayslipTile extends StatefulWidget {
 
 class _RhPayslipTileState extends State<_RhPayslipTile> {
   bool _uploading = false;
-  bool _opening   = false;
+  bool _opening = false;
 
   Map<String, dynamic> get s => widget.slip;
   bool get hasPdf => s['has_pdf'] == true;
@@ -308,14 +364,19 @@ class _RhPayslipTileState extends State<_RhPayslipTile> {
           backgroundColor: AppTheme.accent.withOpacity(0.1),
           child: const Icon(Icons.receipt_long, color: AppTheme.accent),
         ),
-        title: Text(s['user']?['name'] ?? '—', style: const TextStyle(fontWeight: FontWeight.w600)),
+        title: Text(s['user']?['name'] ?? '—',
+            style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(period),
         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
           if (hasPdf) ...[
             _opening
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2))
                 : IconButton(
-                    icon: const Icon(Icons.visibility_outlined, color: AppTheme.accent),
+                    icon: const Icon(Icons.visibility_outlined,
+                        color: AppTheme.accent),
                     tooltip: 'Voir le PDF',
                     onPressed: _openPdf,
                   ),
@@ -326,7 +387,10 @@ class _RhPayslipTileState extends State<_RhPayslipTile> {
             ),
           ] else ...[
             _uploading
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2))
                 : IconButton(
                     icon: const Icon(Icons.attach_file, color: AppTheme.accent),
                     tooltip: 'Joindre PDF',
@@ -347,34 +411,41 @@ class _RhPayslipTileState extends State<_RhPayslipTile> {
     setState(() => _opening = true);
     try {
       final bytes = await ApiService.downloadPayslipPdf(s['id'] as int);
-      final tmp   = await getTemporaryDirectory();
-      final file  = File('${tmp.path}/bulletin_${s['id']}.pdf');
+      final tmp = await getTemporaryDirectory();
+      final file = File('${tmp.path}/bulletin_${s['id']}.pdf');
       await file.writeAsBytes(bytes);
       final result = await OpenFile.open(file.path);
       if (result.type != ResultType.done && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Impossible d\'ouvrir : ${result.message}'), backgroundColor: AppTheme.danger),
+          SnackBar(
+              content: Text('Impossible d\'ouvrir : ${result.message}'),
+              backgroundColor: AppTheme.danger),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: AppTheme.danger),
+          SnackBar(
+              content: Text(e.toString()), backgroundColor: AppTheme.danger),
         );
       }
     } finally {
-      if (mounted) { setState(() => _opening = false); }
+      if (mounted) {
+        setState(() => _opening = false);
+      }
     }
   }
 
   Future<void> _uploadPdf() async {
     final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom, allowedExtensions: ['pdf'],
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
     );
     if (result == null || result.files.isEmpty) return;
     setState(() => _uploading = true);
     try {
-      await ApiService.uploadPayslipPdf(s['id'] as int, File(result.files.first.path!));
+      await ApiService.uploadPayslipPdf(
+          s['id'] as int, File(result.files.first.path!));
       widget.onRefresh();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -384,11 +455,14 @@ class _RhPayslipTileState extends State<_RhPayslipTile> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: AppTheme.danger),
+          SnackBar(
+              content: Text(e.toString()), backgroundColor: AppTheme.danger),
         );
       }
     } finally {
-      if (mounted) { setState(() => _uploading = false); }
+      if (mounted) {
+        setState(() => _uploading = false);
+      }
     }
   }
 
@@ -397,9 +471,12 @@ class _RhPayslipTileState extends State<_RhPayslipTile> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Supprimer le bulletin'),
-        content: Text('Supprimer le bulletin de $period pour ${s['user']?['name'] ?? '—'} ?'),
+        content: Text(
+            'Supprimer le bulletin de $period pour ${s['user']?['name'] ?? '—'} ?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annuler')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppTheme.danger),
             onPressed: () async {
@@ -410,7 +487,9 @@ class _RhPayslipTileState extends State<_RhPayslipTile> {
                 widget.onRefresh();
               } catch (e) {
                 messenger.showSnackBar(
-                  SnackBar(content: Text(e.toString()), backgroundColor: AppTheme.danger),
+                  SnackBar(
+                      content: Text(e.toString()),
+                      backgroundColor: AppTheme.danger),
                 );
               }
             },
@@ -444,27 +523,36 @@ class _EmpPayslipTileState extends State<_EmpPayslipTile> {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: hasPdf ? AppTheme.success.withOpacity(0.1) : AppTheme.border,
+          backgroundColor:
+              hasPdf ? AppTheme.success.withOpacity(0.1) : AppTheme.border,
           child: Icon(
             hasPdf ? Icons.receipt_long : Icons.receipt_long_outlined,
             color: hasPdf ? AppTheme.success : AppTheme.textMuted,
           ),
         ),
-        title: Text(period, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+        title: Text(period,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
         subtitle: hasPdf
-            ? Text(s['pdf_original_name'] ?? '', style: const TextStyle(fontSize: 12))
-            : const Text('PDF non disponible', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+            ? Text(s['pdf_original_name'] ?? '',
+                style: const TextStyle(fontSize: 12))
+            : const Text('PDF non disponible',
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
         trailing: hasPdf
             ? _loading
-                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2))
                 : Row(mainAxisSize: MainAxisSize.min, children: [
                     IconButton(
-                      icon: const Icon(Icons.visibility_outlined, color: AppTheme.accent),
+                      icon: const Icon(Icons.visibility_outlined,
+                          color: AppTheme.accent),
                       tooltip: 'Consulter',
                       onPressed: _openPdf,
                     ),
                     IconButton(
-                      icon: const Icon(Icons.download_outlined, color: AppTheme.info),
+                      icon: const Icon(Icons.download_outlined,
+                          color: AppTheme.info),
                       tooltip: 'Télécharger',
                       onPressed: _downloadPdf,
                     ),
@@ -479,13 +567,15 @@ class _EmpPayslipTileState extends State<_EmpPayslipTile> {
     setState(() => _loading = true);
     try {
       final bytes = await ApiService.downloadPayslipPdf(s['id'] as int);
-      final tmp   = await getTemporaryDirectory();
-      final file  = File('${tmp.path}/bulletin_${s['id']}.pdf');
+      final tmp = await getTemporaryDirectory();
+      final file = File('${tmp.path}/bulletin_${s['id']}.pdf');
       await file.writeAsBytes(bytes);
       final result = await OpenFile.open(file.path);
       if (result.type != ResultType.done) {
         messenger.showSnackBar(
-          SnackBar(content: Text('Impossible d\'ouvrir : ${result.message}'), backgroundColor: AppTheme.danger),
+          SnackBar(
+              content: Text('Impossible d\'ouvrir : ${result.message}'),
+              backgroundColor: AppTheme.danger),
         );
       }
     } catch (e) {
@@ -493,7 +583,9 @@ class _EmpPayslipTileState extends State<_EmpPayslipTile> {
         SnackBar(content: Text(e.toString()), backgroundColor: AppTheme.danger),
       );
     } finally {
-      if (mounted) { setState(() => _loading = false); }
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -501,20 +593,24 @@ class _EmpPayslipTileState extends State<_EmpPayslipTile> {
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _loading = true);
     try {
-      final bytes     = await ApiService.downloadPayslipPdf(s['id'] as int);
+      final bytes = await ApiService.downloadPayslipPdf(s['id'] as int);
       final downloads = await getApplicationDocumentsDirectory();
-      final filename  = 'bulletin_${period.replaceAll(' ', '_')}.pdf';
-      final file      = File('${downloads.path}/$filename');
+      final filename = 'bulletin_${period.replaceAll(' ', '_')}.pdf';
+      final file = File('${downloads.path}/$filename');
       await file.writeAsBytes(bytes);
       messenger.showSnackBar(
-        SnackBar(content: Text('Enregistré : $filename'), backgroundColor: AppTheme.success),
+        SnackBar(
+            content: Text('Enregistré : $filename'),
+            backgroundColor: AppTheme.success),
       );
     } catch (e) {
       messenger.showSnackBar(
         SnackBar(content: Text(e.toString()), backgroundColor: AppTheme.danger),
       );
     } finally {
-      if (mounted) { setState(() => _loading = false); }
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 }

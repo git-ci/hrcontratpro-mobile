@@ -6,6 +6,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/app_drawer.dart';
 import '../../widgets/common_widgets.dart';
 import '../../widgets/announcement_banner.dart';
+import '../../widgets/employee_documents_section.dart';
 
 class EmployeesScreen extends StatefulWidget {
   const EmployeesScreen({super.key});
@@ -366,6 +367,14 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                       : 'CDI (indéterminé)'),
             ]),
           )),
+        ],
+
+        if (AuthService.isDG || AuthService.isRH) ...[
+          const SizedBox(height: 12),
+          EmployeeDocumentsSection(
+            userId: widget.userId,
+            canUpload: AuthService.isRH,
+          ),
         ],
 
         // ── Actions ──────────────────────────────────────────────────────────

@@ -17,6 +17,7 @@ import 'screens/splash_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/employees/employees_screen.dart';
 import 'screens/employees/employee_form_screen.dart';
+import 'screens/employees/employee_documents_management_screen.dart';
 import 'screens/notifications/notifications_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/attendance/qr_scan_screen.dart';
@@ -28,6 +29,7 @@ import 'screens/payslips/payslips_screen.dart';
 import 'screens/messaging/messaging_screen.dart';
 import 'screens/messaging/chat_screen.dart';
 import 'screens/permissions/permissions_screen.dart';
+import 'screens/payslips/employee_documents_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,7 +46,7 @@ void main() async {
 
   if (AuthService.isLoggedIn) {
     await CheckinReminderService.requestPermissions();
-    CheckinReminderService.scheduleReminders();
+    await CheckinReminderService.scheduleReminders();
     await FcmService.init();
   }
 
@@ -57,17 +59,24 @@ final _router = GoRouter(
   redirect: (ctx, state) async {
     final loggedIn = AuthService.isLoggedIn;
     final loc = state.matchedLocation;
-    final isSplash   = loc == '/';
+    final isSplash = loc == '/';
     final isAuthPage = loc == '/login' || loc == '/setup';
 
     if (isSplash) return null; // Le splash gère lui-même la navigation
     if (!loggedIn && !isAuthPage) return '/login';
     if (loggedIn && isAuthPage) return AuthService.initialRoute;
+    if ((loc == '/rh/contracts' || loc == '/rh/payslips') &&
+        !AuthService.canManageContracts) {
+      return '/rh/dashboard';
+    }
+    if (loc.startsWith('/rh/') && !AuthService.isRH) {
+      return AuthService.initialRoute;
+    }
     return null;
   },
   routes: [
     // ── Auth ────────────────────────────────────────────────────────────────
-    GoRoute(path: '/',      builder: (_, __) => const SplashScreen()),
+    GoRoute(path: '/', builder: (_, __) => const SplashScreen()),
     GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
     GoRoute(path: '/setup', builder: (_, __) => const SetupScreen()),
     GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
@@ -105,15 +114,21 @@ final _router = GoRouter(
             builder: (_, __) => const AttendanceScreen()),
         GoRoute(
             path: '/dg/payslips', builder: (_, __) => const PayslipsScreen()),
-        GoRoute(path: '/dg/messaging', builder: (_, __) => const MessagingScreen()),
+        GoRoute(
+            path: '/dg/documents',
+            builder: (_, __) => const EmployeeDocumentsScreen()),
+        GoRoute(
+            path: '/dg/messaging', builder: (_, __) => const MessagingScreen()),
         GoRoute(
           path: '/dg/messaging/chat/:userId',
           builder: (_, s) => ChatScreen(
-            partnerId:   int.parse(s.pathParameters['userId']!),
+            partnerId: int.parse(s.pathParameters['userId']!),
             partnerName: s.extra as String? ?? '',
           ),
         ),
-        GoRoute(path: '/dg/permissions', builder: (_, __) => const PermissionsScreen()),
+        GoRoute(
+            path: '/dg/permissions',
+            builder: (_, __) => const PermissionsScreen()),
       ],
     ),
 
@@ -150,15 +165,30 @@ final _router = GoRouter(
             builder: (_, __) => const AttendanceScreen()),
         GoRoute(
             path: '/rh/payslips', builder: (_, __) => const PayslipsScreen()),
-        GoRoute(path: '/rh/messaging', builder: (_, __) => const MessagingScreen()),
+        GoRoute(
+            path: '/rh/my-payslips',
+            builder: (_, __) => const PayslipsScreen(myOwnOnly: true)),
+        GoRoute(
+            path: '/rh/documents',
+            builder: (_, __) => const EmployeeDocumentsManagementScreen()),
+        GoRoute(
+            path: '/rh/documents/:id',
+            builder: (_, state) => EmployeeDocumentsManagementScreen(
+                  userId: int.parse(state.pathParameters['id']!),
+                  employeeName: state.extra as String?,
+                )),
+        GoRoute(
+            path: '/rh/messaging', builder: (_, __) => const MessagingScreen()),
         GoRoute(
           path: '/rh/messaging/chat/:userId',
           builder: (_, s) => ChatScreen(
-            partnerId:   int.parse(s.pathParameters['userId']!),
+            partnerId: int.parse(s.pathParameters['userId']!),
             partnerName: s.extra as String? ?? '',
           ),
         ),
-        GoRoute(path: '/rh/permissions', builder: (_, __) => const PermissionsScreen()),
+        GoRoute(
+            path: '/rh/permissions',
+            builder: (_, __) => const PermissionsScreen()),
       ],
     ),
 
@@ -180,25 +210,58 @@ final _router = GoRouter(
         GoRoute(
             path: '/emp/attendance',
             builder: (_, __) => const AttendanceScreen()),
-        GoRoute(path: '/emp/messaging', builder: (_, __) => const MessagingScreen()),
+        GoRoute(
+            path: '/emp/messaging',
+            builder: (_, __) => const MessagingScreen()),
         GoRoute(
           path: '/emp/messaging/chat/:userId',
           builder: (_, s) => ChatScreen(
-            partnerId:   int.parse(s.pathParameters['userId']!),
+            partnerId: int.parse(s.pathParameters['userId']!),
             partnerName: s.extra as String? ?? '',
           ),
         ),
-        GoRoute(path: '/emp/permissions', builder: (_, __) => const PermissionsScreen()),
+        GoRoute(
+            path: '/emp/permissions',
+            builder: (_, __) => const PermissionsScreen()),
         GoRoute(
             path: '/emp/payslips', builder: (_, __) => const PayslipsScreen()),
+        GoRoute(
+            path: '/emp/documents',
+            builder: (_, __) => const EmployeeDocumentsScreen()),
       ],
     ),
   ],
 );
 
 // ── App ───────────────────────────────────────────────────────────────────────
-class HrContratProApp extends StatelessWidget {
+class HrContratProApp extends StatefulWidget {
   const HrContratProApp({super.key});
+
+  @override
+  State<HrContratProApp> createState() => _HrContratProAppState();
+}
+
+class _HrContratProAppState extends State<HrContratProApp>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && AuthService.isLoggedIn) {
+      CheckinReminderService.scheduleReminders();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => MaterialApp.router(
         title: 'HrContratPro',
@@ -218,7 +281,7 @@ class _RoleShell extends StatefulWidget {
 }
 
 class _RoleShellState extends State<_RoleShell> {
-  int _unread    = 0;
+  int _unread = 0;
   int _unreadMsg = 0;
   StreamSubscription<void>? _fcmMsgSub;
   Timer? _badgeTimer;
@@ -230,7 +293,8 @@ class _RoleShellState extends State<_RoleShell> {
     // Rafraîchir le badge messages dès qu'une FCM de message privé arrive
     _fcmMsgSub = FcmService.onNewMessage.listen((_) => _refreshUnreadMsg());
     // Polling toutes les 30 s en fallback (FCM pas toujours fiable en background)
-    _badgeTimer = Timer.periodic(const Duration(seconds: 30), (_) => _refreshAll());
+    _badgeTimer =
+        Timer.periodic(const Duration(seconds: 30), (_) => _refreshAll());
   }
 
   @override
@@ -268,8 +332,8 @@ class _RoleShellState extends State<_RoleShell> {
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
-    final items    = _navItems(widget.role);
-    final idx      = items.indexWhere((i) => location.startsWith(i.route));
+    final items = _navItems(widget.role);
+    final idx = items.indexWhere((i) => location.startsWith(i.route));
 
     return Scaffold(
       drawer: AppDrawer(role: widget.role),
@@ -284,8 +348,8 @@ class _RoleShellState extends State<_RoleShell> {
         onTap: (i) => context.go(items[i].route),
         items: items.map((i) {
           final isNotif = i.route.endsWith('/notifications');
-          final isMsg   = i.route.endsWith('/messaging');
-          final count   = isNotif ? _unread : (isMsg ? _unreadMsg : 0);
+          final isMsg = i.route.endsWith('/messaging');
+          final count = isNotif ? _unread : (isMsg ? _unreadMsg : 0);
           final icon = count > 0
               ? Badge(
                   label: Text(
@@ -306,27 +370,33 @@ class _RoleShellState extends State<_RoleShell> {
     switch (role) {
       case 'dg':
         return [
-          _NavItem('/$role/dashboard',      Icons.dashboard_outlined,     'Tableau'),
-          _NavItem('/$role/employees',      Icons.people_outline,         'Employés'),
-          _NavItem('/$role/messaging',      Icons.forum_outlined,         'Messages'),
-          _NavItem('/$role/permissions',    Icons.event_note_outlined,    'Permissions'),
-          _NavItem('/$role/notifications',  Icons.notifications_outlined, 'Notifs'),
+          _NavItem('/$role/dashboard', Icons.dashboard_outlined, 'Tableau'),
+          _NavItem('/$role/employees', Icons.people_outline, 'Employés'),
+          _NavItem('/$role/messaging', Icons.forum_outlined, 'Messages'),
+          _NavItem(
+              '/$role/permissions', Icons.event_note_outlined, 'Permissions'),
+          _NavItem(
+              '/$role/notifications', Icons.notifications_outlined, 'Notifs'),
         ];
       case 'rh':
         return [
-          _NavItem('/$role/dashboard',      Icons.dashboard_outlined,     'Tableau'),
-          _NavItem('/$role/employees',      Icons.people_outline,         'Employés'),
-          _NavItem('/$role/messaging',      Icons.forum_outlined,         'Messages'),
-          _NavItem('/$role/permissions',    Icons.event_note_outlined,    'Permissions'),
-          _NavItem('/$role/notifications',  Icons.notifications_outlined, 'Notifs'),
+          _NavItem('/$role/dashboard', Icons.dashboard_outlined, 'Tableau'),
+          _NavItem('/$role/employees', Icons.people_outline, 'Employés'),
+          _NavItem('/$role/messaging', Icons.forum_outlined, 'Messages'),
+          _NavItem(
+              '/$role/permissions', Icons.event_note_outlined, 'Permissions'),
+          _NavItem(
+              '/$role/notifications', Icons.notifications_outlined, 'Notifs'),
         ];
       default:
         return [
-          const _NavItem('/emp/dashboard',      Icons.home_outlined,          'Accueil'),
-          const _NavItem('/emp/scan',           Icons.qr_code_scanner,        'Scanner'),
-          const _NavItem('/emp/messaging',      Icons.forum_outlined,         'Messages'),
-          const _NavItem('/emp/permissions',    Icons.event_note_outlined,    'Permissions'),
-          const _NavItem('/emp/notifications',  Icons.notifications_outlined, 'Notifs'),
+          const _NavItem('/emp/dashboard', Icons.home_outlined, 'Accueil'),
+          const _NavItem('/emp/scan', Icons.qr_code_scanner, 'Scanner'),
+          const _NavItem('/emp/messaging', Icons.forum_outlined, 'Messages'),
+          const _NavItem(
+              '/emp/permissions', Icons.event_note_outlined, 'Permissions'),
+          const _NavItem(
+              '/emp/notifications', Icons.notifications_outlined, 'Notifs'),
         ];
     }
   }

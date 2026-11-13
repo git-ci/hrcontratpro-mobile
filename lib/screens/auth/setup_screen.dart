@@ -13,12 +13,12 @@ class SetupScreen extends StatefulWidget {
 }
 
 class _SetupScreenState extends State<SetupScreen> {
-  final _nameCtrl    = TextEditingController();
-  final _emailCtrl   = TextEditingController();
-  final _passCtrl    = TextEditingController();
+  final _nameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
 
-  bool _loading  = false;
+  bool _loading = false;
   bool _obscure1 = true;
   bool _obscure2 = true;
 
@@ -31,41 +31,50 @@ class _SetupScreenState extends State<SetupScreen> {
   }
 
   Future<void> _submit() async {
-    final name     = _nameCtrl.text.trim();
-    final email    = _emailCtrl.text.trim();
+    final name = _nameCtrl.text.trim();
+    final email = _emailCtrl.text.trim();
     final password = _passCtrl.text;
-    final confirm  = _confirmCtrl.text;
+    final confirm = _confirmCtrl.text;
 
     // Validation locale
     final local = <String, String>{};
-    if (name.isEmpty)     local['name']     = 'Le nom est obligatoire.';
-    if (email.isEmpty)    local['email']    = 'L\'adresse e-mail est obligatoire.';
-    if (password.isEmpty) local['password'] = 'Le mot de passe est obligatoire.';
-    if (confirm.isEmpty)  local['password_confirmation'] = 'La confirmation est obligatoire.';
+    if (name.isEmpty) local['name'] = 'Le nom est obligatoire.';
+    if (email.isEmpty) local['email'] = 'L\'adresse e-mail est obligatoire.';
+    if (password.isEmpty)
+      local['password'] = 'Le mot de passe est obligatoire.';
+    if (confirm.isEmpty)
+      local['password_confirmation'] = 'La confirmation est obligatoire.';
     if (password.isNotEmpty && confirm.isNotEmpty && password != confirm) {
-      local['password_confirmation'] = 'Les mots de passe ne correspondent pas.';
+      local['password_confirmation'] =
+          'Les mots de passe ne correspondent pas.';
     }
     if (local.isNotEmpty) {
-      setState(() { _clearErrors(); _fieldErrors = local; });
+      setState(() {
+        _clearErrors();
+        _fieldErrors = local;
+      });
       return;
     }
 
-    setState(() { _loading = true; _clearErrors(); });
+    setState(() {
+      _loading = true;
+      _clearErrors();
+    });
 
     try {
       final data = await ApiService.setupDG(
-        name:                 name,
-        email:                email,
-        password:             password,
+        name: name,
+        email: email,
+        password: password,
         passwordConfirmation: confirm,
       );
 
       final token = data['token'] as String?;
-      final user  = data['user']  as Map<String, dynamic>?;
+      final user = data['user'] as Map<String, dynamic>?;
       if (token != null && user != null) {
         await AuthService.saveSession(token, user);
         await CheckinReminderService.requestPermissions();
-        CheckinReminderService.scheduleReminders();
+        await CheckinReminderService.scheduleReminders();
         await FcmService.init();
       }
 
@@ -127,7 +136,8 @@ class _SetupScreenState extends State<SetupScreen> {
         errorMaxLines: 3,
         suffixIcon: onToggleObscure != null
             ? IconButton(
-                icon: Icon(isObscured ? Icons.visibility_off : Icons.visibility),
+                icon:
+                    Icon(isObscured ? Icons.visibility_off : Icons.visibility),
                 onPressed: onToggleObscure,
               )
             : null,
@@ -143,7 +153,11 @@ class _SetupScreenState extends State<SetupScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [AppTheme.primary, AppTheme.primaryLight, Color(0xFF1a1040)],
+            colors: [
+              AppTheme.primary,
+              AppTheme.primaryLight,
+              Color(0xFF1a1040)
+            ],
           ),
         ),
         child: SafeArea(
@@ -177,10 +191,10 @@ class _SetupScreenState extends State<SetupScreen> {
                 const SizedBox(height: 6),
                 Text(
                   'Configuration initiale',
-                  style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14),
+                  style: TextStyle(
+                      color: Colors.white.withOpacity(0.6), fontSize: 14),
                 ),
                 const SizedBox(height: 32),
-
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
@@ -199,12 +213,14 @@ class _SetupScreenState extends State<SetupScreen> {
                     children: [
                       const Text(
                         'Créer le compte Directeur Général',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 6),
                       Text(
                         'Ce compte sera le seul avec accès complet à l\'application.',
-                        style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                        style: TextStyle(
+                            fontSize: 13, color: Colors.grey.shade600),
                       ),
                       const SizedBox(height: 24),
 
@@ -232,8 +248,10 @@ class _SetupScreenState extends State<SetupScreen> {
                         icon: Icons.lock_outline,
                         fieldKey: 'password',
                         isObscured: _obscure1,
-                        onToggleObscure: () => setState(() => _obscure1 = !_obscure1),
-                        helperText: 'Min. 8 caractères, majuscule et chiffre requis',
+                        onToggleObscure: () =>
+                            setState(() => _obscure1 = !_obscure1),
+                        helperText:
+                            'Min. 8 caractères, majuscule et chiffre requis',
                       ),
                       const SizedBox(height: 16),
 
@@ -244,7 +262,8 @@ class _SetupScreenState extends State<SetupScreen> {
                         fieldKey: 'password_confirmation',
                         action: TextInputAction.done,
                         isObscured: _obscure2,
-                        onToggleObscure: () => setState(() => _obscure2 = !_obscure2),
+                        onToggleObscure: () =>
+                            setState(() => _obscure2 = !_obscure2),
                         onSubmit: _submit,
                       ),
 
